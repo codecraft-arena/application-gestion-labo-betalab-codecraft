@@ -1,0 +1,14 @@
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.6.0
+pymysql>=1.1.2
+sqlalchemy>=2.0.0
+python-multipart>=0.0.20
+python-dotenv>=1.0.0
+jinja2>=3.0.0
+pydantic[mailer]>=2.6.0
+passlib[bcrypt]
+pwdlib[argon2]
+cryptography>=41.0.0
+dnspython>=2.8.0
+email-validator>=2.3.0

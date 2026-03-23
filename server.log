@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/luc-marc-sibefeu/Documents/SEMESTRE6/Ecole_de_terrain/Pharaminus/Application-gestion-labo/main.py", line 1, in <module>
+    from fastapi import FastAPI, HTTPException, Depends, Form, Request
+ModuleNotFoundError: No module named 'fastapi'

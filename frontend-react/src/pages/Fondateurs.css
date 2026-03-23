@@ -1,0 +1,205 @@
+/* ===== Fondateurs Page ===== */
+
+/* Hero overrides */
+.fondateurs-hero {
+  min-height: 55vh;
+}
+
+.fondateurs-hero h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 1rem;
+}
+
+.fondateurs-hero p {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* Section titles */
+.fondateurs-section {
+  padding: 5rem 0;
+}
+
+.fondateurs-section .container {
+  width: 100%;
+  max-width: 100%;
+  padding: 0 4rem;
+  margin: 0 auto;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.section-header .section-label {
+  display: inline-block;
+  background: rgba(233, 176, 0, 0.12);
+  color: #e9b000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.45rem 1.2rem;
+  border-radius: 20px;
+  margin-bottom: 1rem;
+}
+
+.section-header h2 {
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #14213d;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.8rem;
+}
+
+.section-header p {
+  font-size: 1.1rem;
+  color: #86868b;
+  max-width: 560px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* Co-directors grid: 2 columns centered */
+.directors-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Collaborators grid: 3 columns */
+.collaborators-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Founder card */
+.founder-card {
+  background: #ffffff;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(233, 176, 0, 0.12);
+  transition: all 0.4s ease;
+  box-shadow: 0 4px 24px rgba(20, 33, 61, 0.06);
+}
+
+.founder-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 50px rgba(20, 33, 61, 0.12);
+  border-color: rgba(233, 176, 0, 0.3);
+}
+
+.founder-photo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: linear-gradient(135deg, #14213d, #1a2a4a);
+}
+
+.founder-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.founder-card:hover .founder-photo img {
+  transform: scale(1.05);
+}
+
+.founder-photo-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: linear-gradient(to top, rgba(20, 33, 61, 0.6), transparent);
+  pointer-events: none;
+}
+
+.founder-info {
+  padding: 1.8rem 2rem 2rem;
+}
+
+.founder-role {
+  display: inline-block;
+  background: rgba(233, 176, 0, 0.1);
+  color: #e9b000;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.9rem;
+  border-radius: 16px;
+  margin-bottom: 0.8rem;
+}
+
+.founder-info h3 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #14213d;
+  margin-bottom: 0.4rem;
+  letter-spacing: -0.02em;
+}
+
+.founder-info .founder-title {
+  font-size: 0.95rem;
+  color: #86868b;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.founder-info .founder-affiliation {
+  font-size: 0.85rem;
+  color: #b0b0b0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.founder-info .founder-affiliation i {
+  font-size: 0.75rem;
+  color: #e9b000;
+}
+
+/* Divider */
+.fondateurs-divider {
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(90deg, #e9b000, #ffd75e);
+  border-radius: 3px;
+  margin: 0 auto;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .directors-grid {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+  }
+  .collaborators-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .collaborators-grid {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+  }
+  .fondateurs-hero h1 {
+    font-size: 2.5rem;
+  }
+  .section-header h2 {
+    font-size: 2rem;
+  }
+}

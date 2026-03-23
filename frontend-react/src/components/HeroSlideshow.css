@@ -1,0 +1,100 @@
+/*
+ * Styles du diaporama hero (Ken Burns effect).
+ * Superpose les images en position absolue avec fondu et zoom continu.
+ * L'overlay sombre assure la lisibilité du texte par-dessus.
+ */
+.hero-slideshow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.5s ease-in-out;
+}
+
+.hero-slide.active {
+  opacity: 1;
+}
+
+.hero-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: heroKenBurns 12s ease-in-out infinite alternate;
+}
+
+/* Each slide gets a slightly different pan direction via nth-child */
+.hero-slide:nth-child(1) img {
+  animation-name: heroKenBurns1;
+}
+.hero-slide:nth-child(2) img {
+  animation-name: heroKenBurns2;
+}
+.hero-slide:nth-child(3) img {
+  animation-name: heroKenBurns3;
+}
+.hero-slide:nth-child(4) img {
+  animation-name: heroKenBurns4;
+}
+.hero-slide:nth-child(5) img {
+  animation-name: heroKenBurns5;
+}
+
+@keyframes heroKenBurns1 {
+  0% {
+    transform: scale(1.05) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.15) translate(-2%, -1%);
+  }
+}
+@keyframes heroKenBurns2 {
+  0% {
+    transform: scale(1.1) translate(-1%, 0);
+  }
+  100% {
+    transform: scale(1.05) translate(2%, -2%);
+  }
+}
+@keyframes heroKenBurns3 {
+  0% {
+    transform: scale(1.05) translate(1%, 1%);
+  }
+  100% {
+    transform: scale(1.15) translate(-1%, 0);
+  }
+}
+@keyframes heroKenBurns4 {
+  0% {
+    transform: scale(1.12) translate(0, -1%);
+  }
+  100% {
+    transform: scale(1.05) translate(-2%, 1%);
+  }
+}
+@keyframes heroKenBurns5 {
+  0% {
+    transform: scale(1.05) translate(-1%, -1%);
+  }
+  100% {
+    transform: scale(1.12) translate(1%, 0);
+  }
+}
+
+/* Dark overlay that sits on top of images to keep text readable */
+.hero-slideshow-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    160deg,
+    rgba(20, 33, 61, 0.88) 0%,
+    rgba(20, 33, 61, 0.72) 50%,
+    rgba(20, 33, 61, 0.85) 100%
+  );
+  pointer-events: none;
+}

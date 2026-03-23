@@ -1,0 +1,228 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+
+.adh-page {
+  font-family: "Inter", sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(160deg, #f4f6fb 0%, #ede4cd 50%, #f4f6fb 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 2rem 1rem;
+}
+
+/* ── Main card ── */
+.adh-card {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(20,33,61,.12);
+  padding: 2.8rem 2.4rem;
+  width: 100%; max-width: 580px;
+  animation: slideUp .35s ease;
+}
+@keyframes slideUp { from { opacity:0; transform: translateY(24px); } to { opacity:1; transform: none; } }
+
+/* Header */
+.adh-header { text-align: center; margin-bottom: 1.6rem; }
+.adh-logo {
+  width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(135deg, #e9b000, #14213d);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1rem;
+}
+.adh-logo i { color: #fff; font-size: 1.3rem; }
+.adh-header h1 { font-size: 1.6rem; font-weight: 800; color: #14213d; margin: 0 0 .4rem; }
+.adh-header p  { font-size: .9rem; color: #8892a4; margin: 0; }
+
+/* Invitation banner */
+.adh-invite-banner {
+  display: flex; align-items: flex-start; gap: .9rem;
+  background: rgba(233,176,0,.07); border: 1px solid rgba(233,176,0,.25);
+  border-radius: 14px; padding: 1rem 1.2rem; margin-bottom: 1.6rem;
+}
+
+/* Stepper */
+.adh-stepper {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 2rem; position: relative;
+}
+.adh-stepper::before {
+  content: "";
+  position: absolute; top: 18px; left: 10%; right: 10%;
+  height: 2px; background: rgba(20,33,61,.08); z-index: 0;
+}
+
+.adh-step {
+  display: flex; flex-direction: column; align-items: center;
+  gap: .4rem; position: relative; z-index: 1; flex: 1;
+}
+
+.adh-step-dot {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .85rem;
+  background: #f4f6fb; border: 2px solid rgba(20,33,61,.12);
+  color: #8892a4; transition: .3s;
+}
+.adh-step.active .adh-step-dot {
+  background: linear-gradient(135deg, #e9b000, #ffd75e);
+  border-color: #e9b000; color: #14213d;
+  box-shadow: 0 4px 16px rgba(233,176,0,.35);
+}
+.adh-step.done .adh-step-dot {
+  background: #22c55e; border-color: #22c55e; color: #fff;
+}
+
+.adh-step span {
+  font-size: .72rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: #8892a4;
+}
+.adh-step.active span { color: #e9b000; }
+.adh-step.done  span  { color: #22c55e; }
+
+/* Alert */
+.adh-alert-error {
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 12px; padding: .85rem 1.1rem; margin-bottom: 1.2rem;
+  font-size: .84rem; color: #dc2626;
+  display: flex; align-items: center; gap: .6rem;
+}
+
+/* Fields */
+.adh-fields { display: flex; flex-direction: column; gap: 1.1rem; }
+
+.adh-field-group { display: flex; flex-direction: column; gap: .4rem; }
+.adh-full { /* full width, already column */ }
+
+.adh-field-group label {
+  font-size: .72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: #8892a4;
+}
+
+.adh-field-group input,
+.adh-field-group select,
+.adh-field-group textarea {
+  padding: .8rem 1rem;
+  border: 1.5px solid rgba(20,33,61,.12); border-radius: 12px;
+  font-size: .92rem; font-family: inherit; color: #14213d;
+  background: #fff; outline: none; transition: .25s;
+}
+.adh-field-group input:focus,
+.adh-field-group select:focus,
+.adh-field-group textarea:focus {
+  border-color: #e9b000;
+  box-shadow: 0 0 0 3px rgba(233,176,0,.12);
+}
+.adh-field-group textarea { resize: vertical; }
+
+/* Occupation cards */
+.adh-occ-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+.adh-occ-card {
+  display: flex; flex-direction: column; align-items: center; gap: .4rem;
+  padding: 1rem .75rem; border-radius: 12px;
+  border: 2px solid rgba(20,33,61,.1); background: #f4f6fb;
+  cursor: pointer; font-size: .82rem; font-weight: 600; color: #8892a4;
+  transition: .2s; text-align: center; line-height: 1.4;
+}
+.adh-occ-card input { display: none; }
+.adh-occ-card.selected {
+  border-color: #e9b000; background: rgba(233,176,0,.08); color: #14213d;
+}
+.adh-occ-card:hover { border-color: rgba(233,176,0,.4); }
+
+/* Summary */
+.adh-summary {
+  background: #f4f6fb; border: 1px solid rgba(233,176,0,.2);
+  border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: .5rem;
+}
+.adh-summary h4 {
+  font-size: .8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: #8892a4; margin: 0 0 .9rem;
+}
+.adh-summary-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .7rem;
+}
+.adh-sum-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #aab; display: block; }
+.adh-sum-value { font-size: .85rem; font-weight: 600; color: #14213d; word-break: break-word; }
+
+/* Password */
+.adh-pwd-wrap { position: relative; }
+.adh-pwd-wrap input { width: 100%; padding-right: 3rem; }
+.adh-pwd-toggle {
+  position: absolute; right: .75rem; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: #8892a4;
+  font-size: .9rem; transition: color .2s;
+}
+.adh-pwd-toggle:hover { color: #e9b000; }
+.adh-pwd-mismatch { font-size: .75rem; color: #ef4444; margin-top: .25rem; }
+
+/* Navigation */
+.adh-nav {
+  display: flex; gap: .9rem; margin-top: 1.8rem; justify-content: flex-end;
+}
+
+.adh-btn-gold {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: linear-gradient(135deg, #e9b000, #ffd75e);
+  color: #14213d; font-weight: 800; font-size: .9rem;
+  padding: .82rem 1.8rem; border-radius: 12px;
+  border: none; cursor: pointer; font-family: inherit; transition: .25s;
+  text-decoration: none;
+}
+.adh-btn-gold:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(233,176,0,.35); }
+.adh-btn-gold:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.adh-btn-outline {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: #fff; color: #14213d; font-weight: 700; font-size: .9rem;
+  padding: .82rem 1.6rem; border-radius: 12px;
+  border: 2px solid rgba(20,33,61,.12); cursor: pointer; font-family: inherit; transition: .25s;
+  text-decoration: none;
+}
+.adh-btn-outline:hover { border-color: #e9b000; color: #e9b000; }
+
+/* ── Loading / error / success states ── */
+.adh-loading, .adh-error-card, .adh-success-card {
+  text-align: center; max-width: 460px; width: 100%;
+  background: #fff; border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(20,33,61,.12);
+  padding: 3rem 2.4rem;
+  animation: slideUp .35s ease;
+}
+
+.adh-loading i { font-size: 2.2rem; color: #e9b000; margin-bottom: .9rem; display: block; }
+.adh-loading p  { color: #8892a4; font-weight: 500; }
+
+.adh-error-icon, .adh-success-icon {
+  width: 72px; height: 72px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; margin: 0 auto 1.2rem;
+}
+.adh-error-icon  { background: rgba(239,68,68,.1); color: #ef4444; }
+.adh-success-icon{ background: rgba(34,197,94,.1); color: #22c55e; }
+
+.adh-error-card h2, .adh-success-card h2 {
+  font-size: 1.4rem; font-weight: 800; color: #14213d; margin: 0 0 .6rem;
+}
+.adh-error-card p, .adh-success-card p {
+  font-size: .9rem; color: #8892a4; line-height: 1.65; margin: 0 0 1.4rem;
+}
+.adh-error-actions { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; }
+
+/* Credentials box */
+.adh-credentials-box {
+  background: #f4f6fb; border: 1px solid rgba(233,176,0,.2);
+  border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 1rem;
+  display: flex; flex-direction: column; gap: .8rem; text-align: left;
+}
+.adh-cred-label {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: #8892a4; display: block; margin-bottom: .2rem;
+}
+.adh-cred-value { font-size: .92rem; font-weight: 700; color: #14213d; }
+.adh-cred-pwd   { color: #e9b000; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .adh-card, .adh-error-card, .adh-success-card { padding: 2rem 1.4rem; }
+  .adh-occ-grid { grid-template-columns: 1fr; }
+  .adh-summary-grid { grid-template-columns: 1fr; }
+  .adh-stepper::before { display: none; }
+}
