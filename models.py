@@ -42,30 +42,17 @@ class Activity(Base):
     status         = Column(String(50),  index=True, default="en attente")
     class_activity = Column(String(100), index=True)
     # User creation & approval workflow columns
-    created_by           = Column(String(100), ForeignKey("users.email"), nullable=True)
+    created_by           = Column(String(100), nullable=True)
     user_approval_status = Column(String(30), default="approved", nullable=False)  # pending_submission, approved, rejected
     reviewed_at          = Column(DateTime, nullable=True)
-    reviewed_by          = Column(String(100), ForeignKey("users.email"), nullable=True)
+    reviewed_by          = Column(String(100), nullable=True)
 
-    creator     = relationship("User", foreign_keys=[created_by])
-    reviewer    = relationship("User", foreign_keys=[reviewed_by])
     contributes = relationship("Contribute", back_populates="activity")
 
 
 class Event(Base):
     """
     Événements créés par l'administrateur (conférences, hackathons, ateliers…).
-
-    ⚠️  Table à créer en base :
-        CREATE TABLE events (
-          id          INT AUTO_INCREMENT PRIMARY KEY,
-          title       VARCHAR(200) NOT NULL,
-          description TEXT,
-          event_date  DATE,
-          location    VARCHAR(255),
-          event_type  VARCHAR(100),
-          created_by  VARCHAR(100)
-        );
     """
     __tablename__ = "events"
     id          = Column(Integer,    primary_key=True, index=True, autoincrement=True)
@@ -75,6 +62,23 @@ class Event(Base):
     location    = Column(String(255))
     event_type  = Column(String(100), default="événement")
     created_by  = Column(String(100))
+
+    participations = relationship("EventParticipate", back_populates="event", cascade="all, delete-orphan")
+
+
+class EventParticipate(Base):
+    """
+    Table de jointure entre User et Event pour gérer les inscriptions.
+    """
+    __tablename__ = "event_participate"
+    id_user              = Column(String(100), ForeignKey("users.email"), primary_key=True, index=True)
+    id_event             = Column(Integer,    ForeignKey("events.id"),     primary_key=True, index=True)
+    # status: pending | accepted | rejected
+    status               = Column(String(20),  default="pending", nullable=False)
+    created_at           = Column(DateTime,    default=datetime.utcnow)
+    
+    user  = relationship("User",  foreign_keys=[id_user])
+    event = relationship("Event", back_populates="participations")
 
 
 class Status(Base):

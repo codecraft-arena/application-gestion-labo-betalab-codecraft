@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
 
-import models
+import models, schemas
 from database import get_db
 from session_manager import SessionManager
 from admin_auth import AdminAuthManager
@@ -156,13 +156,8 @@ async def get_user_details(
 @router.put("/users/{mailer}/update")
 async def update_user(
     mailer: str,
+    data: schemas.AdminUserUpdate,
     request: Request,
-    name: Optional[str] = None,
-    occupation: Optional[str] = None,
-    institution: Optional[str] = None,
-    level: Optional[str] = None,
-    domain: Optional[str] = None,
-    motivation: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Modifie les infos d'un utilisateur."""
@@ -173,18 +168,24 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     
-    if name is not None:
-        user.name = name
-    if occupation is not None:
-        user.occupation = occupation
-    if institution is not None:
-        user.institution = institution
-    if level is not None:
-        user.level = level
-    if domain is not None:
-        user.domain = domain
-    if motivation is not None:
-        user.motivation = motivation
+    if data.name is not None:
+        user.name = data.name
+    if data.occupation is not None:
+        user.occupation = data.occupation
+    if data.institution is not None:
+        user.institution = data.institution
+    if data.level is not None:
+        user.level = data.level
+    if data.domain is not None:
+        user.domain = data.domain
+    if data.motivation is not None:
+        user.motivation = data.motivation
+    if data.validated is not None:
+        user.validated = data.validated
+    if data.suspended is not None:
+        user.suspended = data.suspended
+    if data.role is not None:
+        user.role = data.role
     
     db.commit()
     db.refresh(user)
@@ -275,7 +276,7 @@ async def unsuspend_user(
 @router.put("/users/{mailer}/role")
 async def assign_role(
     mailer: str,
-    role: str,
+    data: schemas.RoleUpdate,
     request: Request,
     db: Session = Depends(get_db),
 ):
@@ -284,7 +285,7 @@ async def assign_role(
     
     valid_roles = {"membre", "chercheur", "responsable", "admin"}
     
-    if role not in valid_roles:
+    if data.role not in valid_roles:
         raise HTTPException(
             status_code=400,
             detail=f"Rôle invalide. Acceptés: {', '.join(valid_roles)}"
@@ -295,10 +296,10 @@ async def assign_role(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     
-    user.role = role
+    user.role = data.role
     db.commit()
     
-    return {"message": f"Rôle '{role}' assigné à {user.name}"}
+    return {"message": f"Rôle '{data.role}' assigné à {user.name}"}
 
 
 @router.delete("/users/{mailer}")

@@ -31,9 +31,6 @@ export default function Navbar() {
             <Link to="/a-propos">A propos</Link>
           </li>
           <li>
-            <Link to="/nous-rejoindre">Nous rejoindre</Link>
-          </li>
-          <li>
             <Link to="/faq">FAQ</Link>
           </li>
           <li>

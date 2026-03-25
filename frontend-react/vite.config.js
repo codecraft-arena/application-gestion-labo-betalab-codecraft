@@ -11,6 +11,7 @@ export default defineConfig({
       "/submit": { target: "http://localhost:8000", changeOrigin: true },
       "/admin-login": { target: "http://localhost:8000", changeOrigin: true },
       "/logout": { target: "http://localhost:8000", changeOrigin: true },
+      "/Report": { target: "http://localhost:8000", changeOrigin: true },
     },
   },
 });

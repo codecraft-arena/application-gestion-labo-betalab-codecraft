@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
 
-import models
+import models, schemas
 from database import get_db
 from session_manager import SessionManager
 from admin_auth import AdminAuthManager
@@ -93,11 +93,7 @@ async def list_activities(
 @router.post("/activities")
 async def create_activity(
     request: Request,
-    id_activity: str,
-    name_activity: str,
-    description: Optional[str] = None,
-    class_activity: Optional[str] = None,
-    status: Optional[str] = "en attente",
+    activity_data: schemas.ActivityCreate,
     db: Session = Depends(get_db),
 ):
     """Crée une nouvelle activité."""
@@ -107,18 +103,18 @@ async def create_activity(
     session = SessionManager.get_session(db, token)
     admin_username = session.user_mailer.replace("admin_", "")
     admin = AdminAuthManager.get_admin_by_username(db, admin_username)
-    admin_email = admin.email
+    admin_email = admin.email if admin else admin_username
     
     # Vérifier qu'elle n'existe pas
-    if db.query(models.Activity).filter(models.Activity.id_activity == id_activity).first():
+    if db.query(models.Activity).filter(models.Activity.id_activity == activity_data.id_activity).first():
         raise HTTPException(status_code=400, detail="Une activité avec cet ID existe déjà")
     
     activity = models.Activity(
-        id_activity=id_activity,
-        name_activity=name_activity,
-        description=description,
-        class_activity=class_activity,
-        status=status,
+        id_activity=activity_data.id_activity,
+        name_activity=activity_data.name_activity,
+        description=activity_data.description,
+        class_activity=activity_data.class_activity,
+        status=activity_data.status,
         created_by=admin_email,  # NEW: Track who created this activity
         user_approval_status="approved",  # NEW: Admin-created activities are auto-approved
     )

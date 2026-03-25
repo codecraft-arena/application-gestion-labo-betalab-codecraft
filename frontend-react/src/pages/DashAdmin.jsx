@@ -11,60 +11,50 @@ import "./DashAdmin.css";
 // ══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════════════════════
-const VIEWS = [
+const NAV_ITEMS = [
   {
     id: "dashboard",
     icon: "fa-gauge-high",
     label: "Dashboard",
-    section: "principal",
+    section: "main",
   },
-  {
-    id: "users",
-    icon: "fa-users",
-    label: "Utilisateurs",
-    section: "principal",
-  },
+  { id: "users", icon: "fa-users", label: "Utilisateurs", section: "main" },
   {
     id: "validation",
     icon: "fa-user-check",
     label: "Validation",
-    section: "principal",
+    section: "main",
   },
   {
     id: "approvals",
     icon: "fa-clipboard-check",
     label: "Approbations",
-    section: "principal",
+    section: "main",
   },
-  {
-    id: "contacts",
-    icon: "fa-envelope",
-    label: "Messages",
-    section: "principal",
-  },
+  { id: "contacts", icon: "fa-envelope", label: "Messages", section: "main" },
   {
     id: "activities",
-    icon: "fa-flask",
+    icon: "fa-calendar-days",
     label: "Activités",
-    section: "contenu",
+    section: "manage",
   },
   {
     id: "events",
     icon: "fa-calendar-days",
     label: "Événements",
-    section: "contenu",
+    section: "manage",
   },
   {
     id: "questions",
-    icon: "fa-circle-question",
+    icon: "fa-question-circle",
     label: "Questions",
-    section: "contenu",
+    section: "content",
   },
   {
     id: "contributions",
-    icon: "fa-layer-group",
+    icon: "fa-hand-holding-heart",
     label: "Contributions",
-    section: "contenu",
+    section: "content",
   },
   {
     id: "stats",
@@ -72,7 +62,6 @@ const VIEWS = [
     label: "Statistiques",
     section: "analyse",
   },
-  { id: "settings", icon: "fa-gear", label: "Paramètres", section: "analyse" },
 ];
 
 const ROLES = ["membre", "chercheur", "responsable", "admin"];
@@ -106,7 +95,6 @@ const PAGE_META = {
     sub: "Toutes les participations aux activités",
   },
   stats: { title: "Statistiques", sub: "Analyse et répartition des données" },
-  settings: { title: "Paramètres", sub: "Informations système" },
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -169,7 +157,26 @@ export default function DashAdmin() {
 
   // ── Modal state ───────────────────────────────────────────────────────────
   const [modal, setModal] = useState(null);
-  // modal: null | { type: 'createActivity'|'createEvent'|'createUser'|'editUser'|'roleUser'|'inviteUser'|'answerQuestion'|'editActivity', data? }
+  // modal: null | { type: 'createActivity'|'createEvent'|'createUser'|'editUser'|'roleUser'|'inviteUser'|'answerQuestion'|'editActivity'|'editProfile', data? }
+
+  // ── Dropdown menu state ─────────────────────────────────────────────────────
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // ── Close dropdown on outside click ───────────────────────────────────────
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownOpen && !event.target.closest(".dropdown-container")) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropdownOpen]);
+
+  // ── Credentials modal (after user creation) ───────────────────────────────
+  const [createdUserCredentials, setCreatedUserCredentials] = useState(null);
+  // { email, password, name }
 
   // ── Form state (modals) ───────────────────────────────────────────────────
   const [form, setForm] = useState({});
@@ -202,7 +209,16 @@ export default function DashAdmin() {
       setContacts(conts);
       setPendingApprovals(pendingAppr);
     } catch (e) {
-      setError(toErrorString(e));
+      const errMsg = toErrorString(e);
+      if (
+        errMsg.includes("401") ||
+        errMsg.includes("403") ||
+        errMsg.includes("authentifié")
+      ) {
+        navigate("/admin");
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -260,7 +276,7 @@ export default function DashAdmin() {
       const { type, data } = modal;
 
       if (type === "createActivity") {
-        await apiFetch("/api/activities", {
+        await apiFetch("/api/admin/activities", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
@@ -289,9 +305,13 @@ export default function DashAdmin() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: form.name }),
         });
-        setActionMsg(
-          `✓ Utilisateur ${form.name} créé\n📧 Email : ${result.email}\n🔑 Mot de passe : ${result.password}`
-        );
+        // Afficher les identifiants dans une modale dédiée
+        setCreatedUserCredentials({
+          name: form.name,
+          email: result.email,
+          password: result.password,
+        });
+        setActionMsg(`✓ Utilisateur ${form.name} créé avec succès`);
       } else if (type === "roleUser") {
         await apiFetch(
           `/api/admin/users/${encodeURIComponent(data.email)}/role`,
@@ -303,11 +323,73 @@ export default function DashAdmin() {
         );
         setActionMsg(`✓ Rôle « ${form.role} » attribué à ${data.email}`);
       } else if (type === "inviteUser") {
-        await apiFetch(
-          `/api/activities/${encodeURIComponent(form.activity_id)}/invite/${encodeURIComponent(data.email)}`,
-          { method: "POST" },
-        );
-        setActionMsg(`✓ Invitation envoyée à ${data.email}`);
+        let email = data?.email;
+        let act_id =
+          form.activity_id || data?.activity_id || data?.initial?.activity_id;
+        let is_event = false;
+
+        // Si l'on vient d'une carte Activité/Event
+        if (data?.activity_id || data?.initial?.activity_id) {
+          act_id = data?.activity_id || data?.initial?.activity_id;
+          email = form.email;
+          // Si l'ID est numérique -> Event
+          is_event =
+            typeof act_id === "number" || String(act_id).startsWith("evt--");
+          if (String(act_id).startsWith("evt--"))
+            act_id = act_id.replace("evt--", "");
+          if (String(act_id).startsWith("act--"))
+            act_id = act_id.replace("act--", "");
+        }
+        // Si l'on vient de la liste des utilisateurs (data.email existe)
+        else {
+          if (act_id.startsWith("evt--")) {
+            is_event = true;
+            act_id = act_id.replace("evt--", "");
+          } else {
+            act_id = act_id.replace("act--", "");
+          }
+        }
+
+        const emailList = Array.isArray(email) ? email : email ? [email] : [];
+        const actList = Array.isArray(act_id) ? act_id : act_id ? [act_id] : [];
+
+        let count = 0;
+        let errors = [];
+
+        for (const e of emailList) {
+          for (const aRaw of actList) {
+            let final_id = String(aRaw);
+            let final_is_event = is_event;
+
+            if (final_id.startsWith("evt--")) {
+              final_is_event = true;
+              final_id = final_id.replace("evt--", "");
+            } else if (final_id.startsWith("act--")) {
+              final_is_event = false;
+              final_id = final_id.replace("act--", "");
+            }
+
+            // Correction du chemin API pour les événements
+            const ep = final_is_event
+              ? `/api/events/${encodeURIComponent(final_id)}/invite/${encodeURIComponent(e)}`
+              : `/api/admin/activities/${encodeURIComponent(final_id)}/invite/${encodeURIComponent(e)}`;
+
+            try {
+              await apiFetch(ep, { method: "POST" });
+              count++;
+            } catch (err) {
+              errors.push(`Erreur pour ${e}: ${err.message}`);
+            }
+          }
+        }
+
+        if (errors.length > 0) {
+          setError(
+            `${count} invitation(s) envoyée(s). Erreurs: ${errors.join(", ")}`,
+          );
+        } else {
+          setActionMsg(`✓ ${count} invitation(s) envoyée(s) avec succès`);
+        }
       } else if (type === "answerQuestion") {
         await apiFetch(`/api/admin/questions/${data.q_id}/answer`, {
           method: "POST",
@@ -318,6 +400,13 @@ export default function DashAdmin() {
           }),
         });
         setActionMsg("✓ Réponse publiée");
+      } else if (type === "editProfile") {
+        await apiFetch("/api/admin/profile/update", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        setActionMsg("✓ Profil mis à jour avec succès");
       }
 
       await loadAll();
@@ -330,7 +419,17 @@ export default function DashAdmin() {
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const fc = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const fc = (e) => {
+    const { name, value, type, options } = e.target;
+    if (type === "select-multiple") {
+      const vals = Array.from(options)
+        .filter((o) => o.selected)
+        .map((o) => o.value);
+      setForm((f) => ({ ...f, [name]: vals }));
+    } else {
+      setForm((f) => ({ ...f, [name]: value }));
+    }
+  };
   const validated = users.filter((u) => u.validated);
   const suspended = users.filter((u) => u.suspended);
   const unreadContacts = contacts.filter((c) => c.status === "nouveau");
@@ -340,6 +439,9 @@ export default function DashAdmin() {
       u.email.toLowerCase().includes(search.toLowerCase()),
   );
   const pendingQ = questions.filter((q) => q.responses?.length === 0);
+  const pendingActivitiesCount = activities.filter(
+    (a) => a.status === "en attente",
+  ).length;
 
   // ══════════════════════════════════════════════════════════════════════════
   // VIEWS
@@ -435,9 +537,7 @@ export default function DashAdmin() {
             <button
               className="btn-primary"
               title="Créer nouvel utilisateur"
-              onClick={() =>
-                openModal("createUser", { initial: { name: "" } })
-              }
+              onClick={() => openModal("createUser", { initial: { name: "" } })}
             >
               <i className="fas fa-plus"></i> Nouvel utilisateur
             </button>
@@ -530,7 +630,7 @@ export default function DashAdmin() {
                     {/* Inviter */}
                     <button
                       className="btn-icon answer"
-                      title="Inviter à une activité"
+                      title="Inviter à une activité ou un événement"
                       onClick={() =>
                         openModal("inviteUser", {
                           email: u.email,
@@ -549,7 +649,7 @@ export default function DashAdmin() {
                           doAction(
                             () =>
                               apiFetch(
-                                `/api/users/${encodeURIComponent(u.email)}/validate`,
+                                `/api/admin/users/${encodeURIComponent(u.email)}/validate`,
                                 { method: "PUT" },
                               ),
                             `✓ ${u.name} validé`,
@@ -559,6 +659,15 @@ export default function DashAdmin() {
                         <i className="fas fa-check"></i>
                       </button>
                     )}
+                    <button
+                      className="btn-icon invite"
+                      title="Inviter à des activités/événements"
+                      onClick={() =>
+                        openModal("inviteUser", { email: u.email })
+                      }
+                    >
+                      <i className="fas fa-plus"></i>
+                    </button>
                     {/* Suspendre / Réactiver */}
                     {u.suspended ? (
                       <button
@@ -568,7 +677,7 @@ export default function DashAdmin() {
                           doAction(
                             () =>
                               apiFetch(
-                                `/api/users/${encodeURIComponent(u.email)}/unsuspend`,
+                                `/api/admin/users/${encodeURIComponent(u.email)}/unsuspend`,
                                 { method: "PUT" },
                               ),
                             `✓ ${u.name} réactivé`,
@@ -585,7 +694,7 @@ export default function DashAdmin() {
                           doAction(
                             () =>
                               apiFetch(
-                                `/api/users/${encodeURIComponent(u.email)}/suspend`,
+                                `/api/admin/users/${encodeURIComponent(u.email)}/suspend`,
                                 { method: "PUT" },
                               ),
                             `✓ ${u.name} suspendu`,
@@ -609,7 +718,7 @@ export default function DashAdmin() {
                         doAction(
                           () =>
                             apiFetch(
-                              `/api/users/${encodeURIComponent(u.email)}`,
+                              `/api/admin/users/${encodeURIComponent(u.email)}`,
                               { method: "DELETE" },
                             ),
                           `✓ ${u.email} supprimé`,
@@ -718,7 +827,7 @@ export default function DashAdmin() {
                       doAction(
                         () =>
                           apiFetch(
-                            `/api/users/${encodeURIComponent(u.email)}/validate`,
+                            `/api/admin/users/${encodeURIComponent(u.email)}/validate`,
                             { method: "PUT" },
                           ),
                         `✓ ${u.name} validé`,
@@ -733,7 +842,7 @@ export default function DashAdmin() {
                       doAction(
                         () =>
                           apiFetch(
-                            `/api/users/${encodeURIComponent(u.email)}/reject`,
+                            `/api/admin/users/${encodeURIComponent(u.email)}/reject`,
                             { method: "PUT" },
                           ),
                         `✓ ${u.email} rejeté`,
@@ -877,6 +986,17 @@ export default function DashAdmin() {
           style={{ display: "block", marginBottom: "1rem" }}
         >
           Toutes les activités ({activities.length})
+          {pendingActivitiesCount > 0 && (
+            <span
+              style={{
+                color: "var(--orange)",
+                marginLeft: "0.5rem",
+                fontSize: "0.85rem",
+              }}
+            >
+              • {pendingActivitiesCount} en attente
+            </span>
+          )}
         </span>
         <table className="custom-table">
           <thead>
@@ -912,7 +1032,15 @@ export default function DashAdmin() {
                 <td>{a.class_activity || "—"}</td>
                 <td>
                   <span
-                    className={`badge ${a.status === "approuvé" ? "green" : a.status === "rejeté" ? "red" : "orange"}`}
+                    className={`badge ${
+                      a.status === "approuvé"
+                        ? "green"
+                        : a.status === "rejeté"
+                          ? "red"
+                          : a.status === "en cours"
+                            ? "blue"
+                            : "orange"
+                    }`}
                   >
                     {a.status || "en attente"}
                   </span>
@@ -927,7 +1055,7 @@ export default function DashAdmin() {
                           doAction(
                             () =>
                               apiFetch(
-                                `/api/activities/${encodeURIComponent(a.id_activity)}/validate`,
+                                `/api/admin/activities/${encodeURIComponent(a.id_activity)}/validate`,
                                 { method: "PUT" },
                               ),
                             `✓ Activité approuvée`,
@@ -945,7 +1073,7 @@ export default function DashAdmin() {
                           doAction(
                             () =>
                               apiFetch(
-                                `/api/activities/${encodeURIComponent(a.id_activity)}/reject`,
+                                `/api/admin/activities/${encodeURIComponent(a.id_activity)}/reject`,
                                 { method: "PUT" },
                               ),
                             `✓ Activité rejetée`,
@@ -977,7 +1105,7 @@ export default function DashAdmin() {
                         doAction(
                           () =>
                             apiFetch(
-                              `/api/activities/${encodeURIComponent(a.id_activity)}`,
+                              `/api/admin/activities/${encodeURIComponent(a.id_activity)}`,
                               { method: "DELETE" },
                             ),
                           "✓ Activité supprimée",
@@ -1038,21 +1166,37 @@ export default function DashAdmin() {
             <div className="event-card" key={ev.id}>
               <div className="event-card-header">
                 <span className="event-type-badge">{ev.event_type}</span>
-                <button
-                  className="btn-icon delete"
-                  title="Supprimer"
-                  onClick={() =>
-                    doAction(
-                      () =>
-                        apiFetch(`/api/admin/events/${ev.id}`, {
-                          method: "DELETE",
-                        }),
-                      `✓ Événement supprimé`,
-                    )
-                  }
-                >
-                  <i className="fas fa-trash"></i>
-                </button>
+                <div style={{ display: "flex", gap: "0.25rem" }}>
+                  <button
+                    className="btn-icon invite"
+                    title="Inviter un utilisateur"
+                    onClick={() =>
+                      openModal("inviteUser", {
+                        forActivity: false,
+                        email: "",
+                        activity_id: ev.id,
+                        initial: { activity_id: ev.id },
+                      })
+                    }
+                  >
+                    <i className="fas fa-user-plus"></i>
+                  </button>
+                  <button
+                    className="btn-icon delete"
+                    title="Supprimer"
+                    onClick={() =>
+                      doAction(
+                        () =>
+                          apiFetch(`/api/admin/events/${ev.id}`, {
+                            method: "DELETE",
+                          }),
+                        `✓ Événement supprimé`,
+                      )
+                    }
+                  >
+                    <i className="fas fa-trash"></i>
+                  </button>
+                </div>
               </div>
               <div className="event-title">{ev.title}</div>
               {ev.description && (
@@ -1121,7 +1265,10 @@ export default function DashAdmin() {
                     openModal("answerQuestion", {
                       q_id: q.id_question,
                       q_title: q.libele_question,
-                      initial: { libelle_response: "", description_response: "" },
+                      initial: {
+                        libelle_response: "",
+                        description_response: "",
+                      },
                     })
                   }
                 >
@@ -1131,7 +1278,11 @@ export default function DashAdmin() {
                   className="btn-icon delete"
                   title="Supprimer la question"
                   onClick={() => {
-                    if (confirm(`Supprimer la question « ${q.libele_question} » ?`)) {
+                    if (
+                      confirm(
+                        `Supprimer la question « ${q.libele_question} » ?`,
+                      )
+                    ) {
                       doAction(
                         () =>
                           apiFetch(`/api/admin/questions/${q.id_question}`, {
@@ -1261,6 +1412,14 @@ export default function DashAdmin() {
           break;
         case "activity_mod":
           url = `/api/admin/activity-modification/${id}/${action}`;
+          break;
+        case "contribution":
+          // id est string composite type "id_activity/email"
+          url = `/api/admin/contributions/${id}/${action}`;
+          break;
+        case "event_participation":
+          // id est string composite type "event/id_event/email"
+          url = `/api/admin/events/participations/${id.replace("event/", "")}/${action}`;
           break;
         default:
           throw new Error("Type d'approbation inconnu");
@@ -1522,6 +1681,109 @@ export default function DashAdmin() {
                 ))}
               </div>
             )}
+
+            {/* Contributions / Participations */}
+            {pendingApprovals.pending_contributions?.length > 0 && (
+              <div className="approval-section">
+                <h3>
+                  <i className="fas fa-handshake"></i> Demandes de participation
+                  ({pendingApprovals.pending_contributions.length})
+                </h3>
+                {pendingApprovals.pending_contributions.map((c) => (
+                  <div className="approval-card" key={c.id}>
+                    <div className="approval-card-header">
+                      <div className="approval-icon">
+                        <i className="fas fa-user-plus"></i>
+                      </div>
+                      <div className="approval-info">
+                        <h4>{c.title}</h4>
+                        <p>Par : {c.user}</p>
+                        <p>
+                          Demandée le{" "}
+                          {new Date(c.created_at).toLocaleDateString("fr-FR")}
+                        </p>
+                      </div>
+                      <div className="approval-actions">
+                        <button
+                          className="btn-approve"
+                          onClick={() =>
+                            handleApproval("contribution", c.id, "approve")
+                          }
+                          title="Approuver"
+                        >
+                          <i className="fas fa-check"></i>
+                        </button>
+                        <button
+                          className="btn-reject"
+                          onClick={() =>
+                            handleApproval("contribution", c.id, "reject")
+                          }
+                          title="Rejeter"
+                        >
+                          <i className="fas fa-times"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Event Participations */}
+            {pendingApprovals.pending_event_participations?.length > 0 && (
+              <div className="approval-section">
+                <h3>
+                  <i className="fas fa-calendar-check"></i> Participations
+                  Événements (
+                  {pendingApprovals.pending_event_participations.length})
+                </h3>
+                {pendingApprovals.pending_event_participations.map((p) => (
+                  <div className="approval-card" key={p.id}>
+                    <div className="approval-card-header">
+                      <div className="approval-icon">
+                        <i className="fas fa-calendar"></i>
+                      </div>
+                      <div className="approval-info">
+                        <h4>{p.title}</h4>
+                        <p>Par : {p.user}</p>
+                        <p>
+                          Demandée le{" "}
+                          {new Date(p.created_at).toLocaleDateString("fr-FR")}
+                        </p>
+                      </div>
+                      <div className="approval-actions">
+                        <button
+                          className="btn-approve"
+                          onClick={() =>
+                            handleApproval(
+                              "event_participation",
+                              p.id,
+                              "approve",
+                            )
+                          }
+                          title="Approuver"
+                        >
+                          <i className="fas fa-check"></i>
+                        </button>
+                        <button
+                          className="btn-reject"
+                          onClick={() =>
+                            handleApproval(
+                              "event_participation",
+                              p.id,
+                              "reject",
+                            )
+                          }
+                          title="Rejeter"
+                        >
+                          <i className="fas fa-times"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </>
@@ -1625,31 +1887,41 @@ export default function DashAdmin() {
     );
   };
 
-  // ── Settings ──────────────────────────────────────────────────────────────
-  const renderSettings = () => (
+  // ── Edit Profile ───────────────────────────────────────────────────────────
+  const renderEditProfile = () => (
     <div className="table-container">
       <span
         className="table-title"
         style={{ display: "block", marginBottom: "1.2rem" }}
       >
-        Informations système
+        Modifier mon profil administrateur
       </span>
       <table className="custom-table">
         <tbody>
-          {[
-            ["Base de données", "MySQL — db_lab"],
-            ["Backend", "FastAPI — Port 8000"],
-            ["Frontend", "React + Vite — Port 30000"],
-            ["Authentification", "Session cookies + token"],
-            ["Hachage", "pbkdf2_sha256 (passlib)"],
-          ].map(([k, v]) => (
-            <tr key={k}>
-              <td style={{ fontWeight: 600, width: "200px" }}>{k}</td>
-              <td style={{ color: "var(--muted)" }}>{v}</td>
-            </tr>
-          ))}
+          <tr>
+            <td style={{ fontWeight: 600, width: "200px" }}>Nom</td>
+            <td>Administrateur</td>
+          </tr>
+          <tr>
+            <td style={{ fontWeight: 600, width: "200px" }}>Email</td>
+            <td>admin@betalab.com</td>
+          </tr>
+          <tr>
+            <td style={{ fontWeight: 600, width: "200px" }}>Rôle</td>
+            <td>Super Administrateur</td>
+          </tr>
         </tbody>
       </table>
+      <div style={{ marginTop: "2rem", textAlign: "center" }}>
+        <button
+          className="btn-primary"
+          onClick={() => openModal("editProfile")}
+          style={{ padding: "0.8rem 2rem", fontSize: "1rem" }}
+        >
+          <i className="fas fa-user-edit" style={{ marginRight: "0.5rem" }}></i>
+          Modifier mes informations
+        </button>
+      </div>
     </div>
   );
 
@@ -1678,7 +1950,7 @@ export default function DashAdmin() {
         contacts.map((c) => (
           <div
             className="contact-card"
-            key={c.id_contact}
+            key={c.id}
             style={{
               border: "1px solid var(--border)",
               borderRadius: "12px",
@@ -1767,7 +2039,10 @@ export default function DashAdmin() {
                 marginBottom: ".8rem",
               }}
             >
-              📅 {new Date(c.date_request).toLocaleString("fr-FR")}
+              📅{" "}
+              {c.created_at
+                ? new Date(c.created_at).toLocaleString("fr-FR")
+                : "Date inconnue"}
             </div>
             <div className="contact-actions">
               {c.status === "nouveau" && (
@@ -1777,7 +2052,7 @@ export default function DashAdmin() {
                   onClick={() =>
                     doAction(
                       () =>
-                        apiFetch(`/api/contact/${c.id_contact}/read`, {
+                        apiFetch(`/api/contact/${c.id}/read`, {
                           method: "PUT",
                         }),
                       "✓ Message marqué comme lu",
@@ -1794,7 +2069,7 @@ export default function DashAdmin() {
                   onClick={() =>
                     doAction(
                       () =>
-                        apiFetch(`/api/contact/${c.id_contact}/invite`, {
+                        apiFetch(`/api/contact/${c.id}/invite`, {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({}),
@@ -1809,15 +2084,16 @@ export default function DashAdmin() {
               <button
                 className="contact-btn delete"
                 title="Supprimer"
-                onClick={() =>
+                onClick={() => {
+                  if (!confirm(`Supprimer le message de ${c.name} ?`)) return;
                   doAction(
                     () =>
-                      apiFetch(`/api/contact/${c.id_contact}`, {
+                      apiFetch(`/api/contact/${c.id}`, {
                         method: "DELETE",
                       }),
                     "✓ Message supprimé",
-                  )
-                }
+                  );
+                }}
               >
                 <i className="fas fa-trash"></i> Supprimer
               </button>
@@ -1858,8 +2134,6 @@ export default function DashAdmin() {
         return renderContributions();
       case "stats":
         return renderStats();
-      case "settings":
-        return renderSettings();
       default:
         return renderDashboard();
     }
@@ -1880,6 +2154,8 @@ export default function DashAdmin() {
       roleUser: "Attribuer un rôle",
       inviteUser: "Inviter à une activité",
       answerQuestion: "Répondre à la question",
+      editActivity: "Modifier l'activité",
+      editProfile: "Modifier mon profil administrateur",
     };
 
     return (
@@ -1915,6 +2191,8 @@ export default function DashAdmin() {
               >
                 <option value="en attente">En attente</option>
                 <option value="approuvé">Approuvé</option>
+                <option value="en cours">En cours</option>
+                <option value="rejeté">Rejeté</option>
               </select>
             </div>
             <div className="form-group full">
@@ -2004,8 +2282,15 @@ export default function DashAdmin() {
                 autoFocus
               />
             </div>
-            <p style={{ fontSize: ".85rem", color: "var(--muted)", gridColumn: "1/-1" }}>
-              ℹ️ L'email et le mot de passe seront générés automatiquement. L'utilisateur pourra les modifier après connexion.
+            <p
+              style={{
+                fontSize: ".85rem",
+                color: "var(--muted)",
+                gridColumn: "1/-1",
+              }}
+            >
+              ℹ️ L'email et le mot de passe seront générés automatiquement.
+              L'utilisateur pourra les modifier après connexion.
             </p>
           </div>
         )}
@@ -2071,52 +2356,212 @@ export default function DashAdmin() {
         {/* ── Invite User ── */}
         {type === "inviteUser" && (
           <div className="form-grid">
-            {!data?.forActivity && (
+            {/* If coming from User section (data.email exists) and NOT forActivity, show Activity/Event selection */}
+            {!data?.forActivity && data?.email && (
               <div className="form-group full">
-                <label>ID de l'activité *</label>
-                <select
-                  name="activity_id"
-                  value={form.activity_id || ""}
-                  onChange={fc}
-                >
-                  <option value="">Sélectionner une activité…</option>
-                  {activities.map((a) => (
-                    <option key={a.id_activity} value={a.id_activity}>
-                      {a.name_activity}
-                    </option>
-                  ))}
-                </select>
+                <label>Objet(s) de l'invitation *</label>
+                <div className="multi-select-container">
+                  <div className="multi-select-header">
+                    <span className="multi-select-count">
+                      {form.activity_id?.length || 0} sélectionné(s)
+                    </span>
+                    <button
+                      type="button"
+                      className="multi-select-clear"
+                      onClick={() => setForm({ ...form, activity_id: [] })}
+                    >
+                      Tout effacer
+                    </button>
+                  </div>
+                  <div className="multi-select-grid">
+                    <div className="multi-select-section">
+                      <div className="multi-select-section-title">
+                        🎯 Activités
+                      </div>
+                      {activities.map((a) => (
+                        <label
+                          key={a.id_activity}
+                          className="multi-select-item"
+                        >
+                          <input
+                            type="checkbox"
+                            value={`act--${a.id_activity}`}
+                            checked={
+                              form.activity_id?.includes(
+                                `act--${a.id_activity}`,
+                              ) || false
+                            }
+                            onChange={(e) => {
+                              const current = form.activity_id || [];
+                              if (e.target.checked) {
+                                setForm({
+                                  ...form,
+                                  activity_id: [...current, e.target.value],
+                                });
+                              } else {
+                                setForm({
+                                  ...form,
+                                  activity_id: current.filter(
+                                    (v) => v !== e.target.value,
+                                  ),
+                                });
+                              }
+                            }}
+                          />
+                          <span className="multi-select-label">
+                            <span className="multi-select-name">
+                              {a.name_activity}
+                            </span>
+                            <span className="multi-select-type">Activité</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="multi-select-section">
+                      <div className="multi-select-section-title">
+                        📅 Événements
+                      </div>
+                      {events.map((e) => (
+                        <label
+                          key={`evt-${e.id}`}
+                          className="multi-select-item"
+                        >
+                          <input
+                            type="checkbox"
+                            value={`evt--${e.id}`}
+                            checked={
+                              form.activity_id?.includes(`evt--${e.id}`) ||
+                              false
+                            }
+                            onChange={(e) => {
+                              const current = form.activity_id || [];
+                              if (e.target.checked) {
+                                setForm({
+                                  ...form,
+                                  activity_id: [...current, e.target.value],
+                                });
+                              } else {
+                                setForm({
+                                  ...form,
+                                  activity_id: current.filter(
+                                    (v) => v !== e.target.value,
+                                  ),
+                                });
+                              }
+                            }}
+                          />
+                          <span className="multi-select-label">
+                            <span className="multi-select-name">{e.title}</span>
+                            <span className="multi-select-type">Événement</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
-            {data?.forActivity && (
+
+            {/* If coming from Activity/Event card (data.activity_id or data.initial.activity_id exists), show User selection */}
+            {(data?.activity_id || data?.initial?.activity_id) && (
               <div className="form-group full">
-                <label>Email de l'utilisateur à inviter *</label>
-                <select name="email" value={form.email || ""} onChange={fc}>
-                  <option value="">Sélectionner un utilisateur…</option>
-                  {users.map((u) => (
-                    <option key={u.email} value={u.email}>
-                      {u.name} ({u.email})
-                    </option>
-                  ))}
-                </select>
+                <label>Utilisateurs à inviter *</label>
+                <div className="multi-select-container">
+                  <div className="multi-select-header">
+                    <span className="multi-select-count">
+                      {form.email?.length || 0} sélectionné(s)
+                    </span>
+                    <button
+                      type="button"
+                      className="multi-select-clear"
+                      onClick={() => setForm({ ...form, email: [] })}
+                    >
+                      Tout effacer
+                    </button>
+                  </div>
+                  <div className="multi-select-grid">
+                    <div className="multi-select-section">
+                      <div className="multi-select-section-title">
+                        👥 Utilisateurs validés
+                      </div>
+                      {users
+                        .filter((u) => u.validated && !u.suspended)
+                        .map((u) => (
+                          <label key={u.email} className="multi-select-item">
+                            <input
+                              type="checkbox"
+                              value={u.email}
+                              checked={form.email?.includes(u.email) || false}
+                              onChange={(e) => {
+                                const current = form.email || [];
+                                if (e.target.checked) {
+                                  setForm({
+                                    ...form,
+                                    email: [...current, u.email],
+                                  });
+                                } else {
+                                  setForm({
+                                    ...form,
+                                    email: current.filter((v) => v !== u.email),
+                                  });
+                                }
+                              }}
+                            />
+                            <span className="multi-select-label">
+                              <span className="multi-select-name">
+                                {u.name}
+                              </span>
+                              <span className="multi-select-email">
+                                {u.email}
+                              </span>
+                              <span
+                                className={`multi-select-role ${u.role || "membre"}`}
+                              >
+                                {u.role || "membre"}
+                              </span>
+                            </span>
+                          </label>
+                        ))}
+                    </div>
+                    <div className="multi-select-section">
+                      <div className="multi-select-section-title">
+                        ⏳ En attente
+                      </div>
+                      {users
+                        .filter((u) => !u.validated)
+                        .map((u) => (
+                          <label
+                            key={u.email}
+                            className="multi-select-item disabled"
+                          >
+                            <input type="checkbox" value={u.email} disabled />
+                            <span className="multi-select-label">
+                              <span className="multi-select-name">
+                                {u.name}
+                              </span>
+                              <span className="multi-select-email">
+                                {u.email}
+                              </span>
+                              <span className="multi-select-status">
+                                En attente de validation
+                              </span>
+                            </span>
+                          </label>
+                        ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
+
             <div
               className="form-group full"
               style={{ fontSize: ".82rem", color: "var(--muted)" }}
             >
-              {data?.forActivity ? (
-                <>
-                  Activité :{" "}
-                  <strong>
-                    {form.activity_id || data?.initial?.activity_id}
-                  </strong>
-                </>
-              ) : (
-                <>
-                  Utilisateur : <strong>{data?.email}</strong>
-                </>
-              )}
+              <strong>Cible :</strong>{" "}
+              {data?.activity_id || data?.initial?.activity_id
+                ? `Utilisateur(s) à choisir pour l'objet #${data?.activity_id || data?.initial?.activity_id}`
+                : `Objet(s) à choisir pour l'utilisateur ${data?.email}`}
             </div>
           </div>
         )}
@@ -2160,6 +2605,73 @@ export default function DashAdmin() {
           </div>
         )}
 
+        {/* ── Edit Profile ── */}
+        {type === "editProfile" && (
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Nom *</label>
+              <input
+                name="name"
+                placeholder="Votre nom complet"
+                value={form.name || ""}
+                onChange={fc}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Prénom *</label>
+              <input
+                name="firstname"
+                placeholder="Votre prénom"
+                value={form.firstname || ""}
+                onChange={fc}
+                required
+              />
+            </div>
+            <div className="form-group full">
+              <label>Adresse email *</label>
+              <input
+                name="email"
+                type="email"
+                placeholder="admin@betalab.com"
+                value={form.email || ""}
+                onChange={fc}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Téléphone</label>
+              <input
+                name="phone"
+                type="tel"
+                placeholder="+237 123 456 789"
+                value={form.phone || ""}
+                onChange={fc}
+              />
+            </div>
+            <div className="form-group">
+              <label>Nouveau mot de passe</label>
+              <input
+                name="password"
+                type="password"
+                placeholder="Laisser vide pour ne pas changer"
+                value={form.password || ""}
+                onChange={fc}
+              />
+            </div>
+            <div className="form-group">
+              <label>Confirmer le mot de passe</label>
+              <input
+                name="confirmPassword"
+                type="password"
+                placeholder="Confirmer le nouveau mot de passe"
+                value={form.confirmPassword || ""}
+                onChange={fc}
+              />
+            </div>
+          </div>
+        )}
+
         <div className="modal-actions">
           <button
             className="btn-secondary"
@@ -2186,18 +2698,14 @@ export default function DashAdmin() {
   // ══════════════════════════════════════════════════════════════════════════
   // LAYOUT
   // ══════════════════════════════════════════════════════════════════════════
-  const navSections = [...new Set(VIEWS.map((v) => v.section))];
+  const navSections = [...new Set(NAV_ITEMS.map((v) => v.section))];
 
   return (
     <div className="admin-layout">
       {/* ── SIDEBAR ── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <img
-            src="/betalabs.png"
-            alt="BetaLab"
-            className="sidebar-logo-img"
-          />
+          <img src="/betalabs.png" alt="BetaLab" className="sidebar-logo-img" />
           <span className="logo-text">BetaLab</span>
           <span className="logo-badge">ADMIN</span>
         </div>
@@ -2205,7 +2713,7 @@ export default function DashAdmin() {
         {navSections.map((sec) => (
           <div key={sec}>
             <div className="nav-section">{sec}</div>
-            {VIEWS.filter((v) => v.section === sec).map((v) => (
+            {NAV_ITEMS.filter((v) => v.section === sec).map((v) => (
               <button
                 key={v.id}
                 className={`nav-item${view === v.id ? " active" : ""}`}
@@ -2222,6 +2730,11 @@ export default function DashAdmin() {
                 {v.id === "questions" && pendingQ.length > 0 && (
                   <span className="nav-badge">{pendingQ.length}</span>
                 )}
+                {v.id === "activities" && pendingActivitiesCount > 0 && (
+                  <span className="nav-badge badge-orange">
+                    {pendingActivitiesCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -2234,13 +2747,39 @@ export default function DashAdmin() {
               <div className="name">Administrateur</div>
               <div className="role-label">Super Admin</div>
             </div>
-            <button
-              className="logout-btn"
-              title="Se déconnecter"
-              onClick={handleLogout}
-            >
-              <i className="fas fa-sign-out-alt"></i>
-            </button>
+            <div className="dropdown-container">
+              <button
+                className="dropdown-toggle"
+                title="Menu"
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+              >
+                <i className="fas fa-ellipsis-v"></i>
+              </button>
+              {dropdownOpen && (
+                <div className="dropdown-menu">
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      openModal("editProfile");
+                    }}
+                  >
+                    <i className="fas fa-user-edit"></i>
+                    Modifier mon profil
+                  </button>
+                  <button
+                    className="dropdown-item logout"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    <i className="fas fa-sign-out-alt"></i>
+                    Se déconnecter
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </aside>
@@ -2274,6 +2813,195 @@ export default function DashAdmin() {
 
       {/* ── MODALS ── */}
       {renderModal()}
+
+      {/* ── CREDENTIALS MODAL (après création utilisateur) ── */}
+      {createdUserCredentials && (
+        <div
+          className="modal-overlay"
+          onClick={(e) =>
+            e.target === e.currentTarget && setCreatedUserCredentials(null)
+          }
+        >
+          <div className="modal" style={{ maxWidth: "480px" }}>
+            <div
+              className="modal-header"
+              style={{
+                background: "linear-gradient(135deg, #1a3a2a, #2d6a4f)",
+                borderRadius: "16px 16px 0 0",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: ".6rem",
+                }}
+              >
+                <i className="fas fa-key" style={{ color: "#ffd700" }}></i>
+                Identifiants créés
+              </h3>
+              <button
+                className="modal-close"
+                onClick={() => setCreatedUserCredentials(null)}
+                style={{ color: "#fff" }}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div style={{ padding: "1.5rem" }}>
+              <div
+                style={{
+                  background: "rgba(45, 106, 79, 0.08)",
+                  border: "1px solid rgba(45, 106, 79, 0.2)",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  marginBottom: "1.2rem",
+                }}
+              >
+                <p
+                  style={{
+                    margin: "0 0 .8rem",
+                    fontSize: ".88rem",
+                    color: "var(--muted)",
+                  }}
+                >
+                  ⚠️ Notez ces informations et transmettez-les à{" "}
+                  <strong>{createdUserCredentials.name}</strong>. Le mot de
+                  passe ne sera plus affiché.
+                </p>
+              </div>
+
+              {/* Email */}
+              <div style={{ marginBottom: "1rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: ".8rem",
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    marginBottom: ".4rem",
+                    textTransform: "uppercase",
+                    letterSpacing: ".05em",
+                  }}
+                >
+                  📧 Adresse email
+                </label>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: ".5rem",
+                    alignItems: "center",
+                  }}
+                >
+                  <code
+                    style={{
+                      flex: 1,
+                      background: "var(--bg)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
+                      padding: ".65rem 1rem",
+                      fontSize: ".9rem",
+                      color: "var(--dark)",
+                      fontFamily: "monospace",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {createdUserCredentials.email}
+                  </code>
+                  <button
+                    className="btn-icon answer"
+                    title="Copier l'email"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        createdUserCredentials.email,
+                      );
+                      setActionMsg("✓ Email copié !");
+                    }}
+                    style={{ flexShrink: 0 }}
+                  >
+                    <i className="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mot de passe */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: ".8rem",
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    marginBottom: ".4rem",
+                    textTransform: "uppercase",
+                    letterSpacing: ".05em",
+                  }}
+                >
+                  🔑 Mot de passe temporaire
+                </label>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: ".5rem",
+                    alignItems: "center",
+                  }}
+                >
+                  <code
+                    style={{
+                      flex: 1,
+                      background: "var(--bg)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
+                      padding: ".65rem 1rem",
+                      fontSize: ".9rem",
+                      color: "var(--dark)",
+                      fontFamily: "monospace",
+                      letterSpacing: ".1em",
+                    }}
+                  >
+                    {createdUserCredentials.password}
+                  </code>
+                  <button
+                    className="btn-icon answer"
+                    title="Copier le mot de passe"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        createdUserCredentials.password,
+                      );
+                      setActionMsg("✓ Mot de passe copié !");
+                    }}
+                    style={{ flexShrink: 0 }}
+                  >
+                    <i className="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bouton copier tout */}
+              <div style={{ display: "flex", gap: ".8rem" }}>
+                <button
+                  className="btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={() => {
+                    const text = `Identifiants BetaLab\nEmail: ${createdUserCredentials.email}\nMot de passe: ${createdUserCredentials.password}`;
+                    navigator.clipboard.writeText(text);
+                    setActionMsg("✓ Identifiants complets copiés !");
+                  }}
+                >
+                  <i className="fas fa-copy"></i> Copier les deux
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setCreatedUserCredentials(null)}
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

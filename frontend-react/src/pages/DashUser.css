@@ -1050,6 +1050,34 @@
   align-items: flex-start;
   gap: 0.75rem;
   margin-bottom: 0.6rem;
+  justify-content: space-between;
+}
+
+.q-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.status-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.status-badge.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+.status-badge.approved {
+  background: rgba(34, 197, 94, 0.1);
+  color: #166534;
+}
+.status-badge.rejected {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
 }
 
 .q-icon {
@@ -1075,6 +1103,48 @@
   color: var(--muted);
   margin-top: 0.25rem;
   line-height: 1.55;
+}
+
+.responses-section {
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px dashed rgba(233, 176, 0, 0.2);
+}
+
+.response-item {
+  background: rgba(34, 197, 94, 0.04);
+  border: 1px solid rgba(34, 197, 94, 0.12);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.response-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #166534;
+  background: rgba(34, 197, 94, 0.12);
+  padding: 0.18rem 0.6rem;
+  border-radius: 20px;
+  margin-bottom: 0.5rem;
+}
+
+.response-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 0.2rem;
+}
+
+.response-desc {
+  font-size: 0.82rem;
+  color: #4b5563;
+  line-height: 1.5;
 }
 
 /* Suggestion list */
@@ -1491,4 +1561,119 @@
   .inv-grid {
     grid-template-columns: 1fr;
   }
+}
+/* Discovery / Exploration */
+.disco-section h3 {
+  font-size: 1.15rem;
+  color: var(--dark);
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.disco-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 1.5rem;
+}
+
+.disco-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+}
+
+.disco-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  border-color: var(--gold);
+}
+
+.disco-card.event {
+  border-left: 4px solid var(--gold);
+}
+
+.disco-badge {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.25rem 0.65rem;
+  background: var(--bg);
+  color: var(--gold);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.disco-card h4 {
+  margin: 0 0 0.75rem 0;
+  color: var(--dark);
+  font-size: 1.1rem;
+}
+
+.disco-card p {
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+  flex-grow: 1;
+}
+
+.disco-date, .disco-loc {
+  font-size: 0.82rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.disco-date { margin-bottom: 0.5rem; font-weight: 500; }
+
+.disco-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--bg);
+}
+
+.btn-join {
+  background: var(--dark);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-join:hover {
+  background: var(--gold);
+  transform: scale(1.05);
+}
+
+.status-tag {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 10px;
+}
+
+.status-tag.accepted {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.status-tag.pending {
+  background: #fffbeb;
+  color: #d97706;
 }

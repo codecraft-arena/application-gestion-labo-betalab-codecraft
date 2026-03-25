@@ -52,6 +52,7 @@ const NAV = [
   { id: "pending", icon: "fa-clock", label: "En Attente" },
   { id: "invitations", icon: "fa-envelope-open", label: "Invitations" },
   { id: "contributions", icon: "fa-layer-group", label: "Contributions" },
+  { id: "exploration", icon: "fa-compass", label: "Exploration" },
   { id: "questions", icon: "fa-circle-question", label: "Questions" },
   { id: "suggestions", icon: "fa-lightbulb", label: "Suggestions" },
 ];
@@ -67,6 +68,8 @@ export default function DashUser() {
   const [questions, setQuestions] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [pendingMods, setPendingMods] = useState([]);
+  const [allActivities, setAllActivities] = useState([]);
+  const [allEvents, setAllEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("home");
   const [error, setError] = useState("");
@@ -103,18 +106,22 @@ export default function DashUser() {
       const me = await apiFetch("/api/me");
       setUser(me);
       const enc = encodeURIComponent(me.email);
-      const [contribs, invs, qs, ss, pending] = await Promise.all([
+      const [contribs, invs, qs, ss, pending, allActivs, allEvts] = await Promise.all([
         apiFetch(`/api/contributions/${enc}`),
         apiFetch(`/api/invitations/${enc}`),
         apiFetch(`/api/questions/user/${enc}`),
         apiFetch(`/api/suggestions/user/${enc}`),
         apiFetch(`/api/users/${enc}/pending-modifications`),
+        apiFetch("/api/activities/all"),
+        apiFetch("/api/events/all"),
       ]);
       setContributions(contribs);
       setInvitations(invs);
       setQuestions(qs);
       setSuggestions(ss);
       setPendingMods(pending);
+      setAllActivities(allActivs);
+      setAllEvents(allEvts);
     } catch (err) {
       const errMsg = toErrorString(err);
       if (errMsg.includes("401") || errMsg.includes("authentifié")) {
@@ -126,6 +133,20 @@ export default function DashUser() {
       setLoading(false);
     }
   }, [navigate]);
+
+  const handleRequestParticipation = async (id, type) => {
+    try {
+      const endpoint =
+        type === "activity"
+          ? `/api/activities/${id}/request`
+          : `/api/events/${id}/request`;
+      const res = await apiFetch(endpoint, { method: "POST" });
+      setActionMsg(`✓ ${res.message}`);
+      loadAll();
+    } catch (e) {
+      setError(toErrorString(e));
+    }
+  };
 
   useEffect(() => {
     loadAll();
@@ -285,6 +306,10 @@ export default function DashUser() {
     contributions: {
       title: "Contributions",
       sub: "Activités auxquelles vous participez",
+    },
+    exploration: {
+      title: "Exploration",
+      sub: "Découvrez de nouvelles activités et événements",
     },
     questions: { title: "Questions", sub: "Posez vos questions à l'équipe" },
     suggestions: {
@@ -637,6 +662,104 @@ export default function DashUser() {
     </>
   );
 
+  const renderExploration = () => {
+    // Vérifier si l'utilisateur participe déjà ou a une demande en cours
+    const getStatus = (id, type) => {
+      if (type === "activity") {
+        const c = contributions.find((x) => x.id_activity === id);
+        if (c) return "accepted";
+        const i = invitations.find((x) => x.id_activity === id);
+        if (i) return "pending";
+        return null;
+      } else {
+        const c = contributions.find((x) => x.id_activity === id); // id_activity contient l'id de l'événement ici (voir backend mapping)
+        if (c) return "accepted";
+        const i = invitations.find((x) => x.id_event === id);
+        if (i) return "pending";
+        return null;
+      }
+    };
+
+    return (
+      <div className="discovery-view">
+        <div className="disco-section">
+          <h3>
+            <i className="fas fa-layer-group"></i> Activités disponibles (
+            {allActivities.length})
+          </h3>
+          <div className="disco-grid">
+            {allActivities.map((a) => {
+              const status = getStatus(a.id_activity, "activity");
+              return (
+                <div className="disco-card" key={a.id_activity}>
+                  <div className="disco-badge">{a.class_activity}</div>
+                  <h4>{a.name_activity}</h4>
+                  <p>{a.description}</p>
+                  <div className="disco-footer">
+                    {status ? (
+                      <span className={`status-tag ${status}`}>
+                        {status === "accepted" ? "Inscrit" : "Demande envoyée"}
+                      </span>
+                    ) : (
+                      <button
+                        className="btn-join"
+                        onClick={() =>
+                          handleRequestParticipation(a.id_activity, "activity")
+                        }
+                      >
+                        Rejoindre
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="disco-section" style={{ marginTop: "3rem" }}>
+          <h3>
+            <i className="fas fa-calendar-star"></i> Événements à venir (
+            {allEvents.length})
+          </h3>
+          <div className="disco-grid">
+            {allEvents.map((e) => {
+              const status = getStatus(e.id, "event");
+              return (
+                <div className="disco-card event" key={e.id}>
+                  <div className="disco-badge">{e.event_type}</div>
+                  <div className="disco-date">
+                    <i className="fas fa-calendar"></i>{" "}
+                    {new Date(e.event_date).toLocaleDateString("fr-FR")}
+                  </div>
+                  <h4>{e.title}</h4>
+                  <p>{e.description}</p>
+                  <div className="disco-footer">
+                    <span className="disco-loc">
+                      <i className="fas fa-location-dot"></i> {e.location}
+                    </span>
+                    {status ? (
+                      <span className={`status-tag ${status}`}>
+                        {status === "accepted" ? "Inscrit" : "Demande envoyée"}
+                      </span>
+                    ) : (
+                      <button
+                        className="btn-join"
+                        onClick={() => handleRequestParticipation(e.id, "event")}
+                      >
+                        Participer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── Questions ─────────────────────────────────────────────────────────────────
   const renderQuestions = () => (
     <>
@@ -709,16 +832,44 @@ export default function DashUser() {
           {questions.map((q) => (
             <div className="question-card" key={q.id_question}>
               <div className="question-card-header">
-                <div className="q-icon">
-                  <i className="fas fa-question"></i>
+                <div className="q-header-left">
+                  <div className="q-icon">
+                    <i className="fas fa-question"></i>
+                  </div>
+                  <div>
+                    <div className="q-title">{q.libele_question}</div>
+                    {q.description_question && (
+                      <div className="q-desc">{q.description_question}</div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <div className="q-title">{q.libele_question}</div>
-                  {q.description_question && (
-                    <div className="q-desc">{q.description_question}</div>
-                  )}
+                <div className={`status-badge ${q.visibility || "pending"}`}>
+                  {q.visibility === "approved"
+                    ? "Répondu"
+                    : q.visibility === "rejected"
+                      ? "Refusé"
+                      : "En attente"}
                 </div>
               </div>
+
+              {/* NEW: Admin Responses */}
+              {q.responses && q.responses.length > 0 && (
+                <div className="responses-section">
+                  {q.responses.map((resp) => (
+                    <div className="response-item" key={resp.id_response}>
+                      <div className="response-badge">
+                        <i className="fas fa-reply"></i> Réponse de l'admin
+                      </div>
+                      <div className="response-title">{resp.libelle_response}</div>
+                      {resp.description_response && (
+                        <div className="response-desc">
+                          {resp.description_response}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -821,6 +972,13 @@ export default function DashUser() {
                       <div className="s-desc">{s.description_suggest}</div>
                     )}
                   </div>
+                </div>
+                <div className={`status-badge ${s.visibility || "pending"}`}>
+                  {s.visibility === "approved"
+                    ? "Validé"
+                    : s.visibility === "rejected"
+                      ? "Refusé"
+                      : "En attente"}
                 </div>
                 {s.note > 0 && (
                   <div style={{ flexShrink: 0 }}>
@@ -995,6 +1153,8 @@ export default function DashUser() {
         return renderInvitations();
       case "contributions":
         return renderContributions();
+      case "exploration":
+        return renderExploration();
       case "questions":
         return renderQuestions();
       case "suggestions":

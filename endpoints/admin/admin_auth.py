@@ -22,6 +22,9 @@ from dependencies import get_password_hash, verify_password
 
 router = APIRouter(prefix="/api/admin", tags=["Admin - Auth"])
 
+# ── Stockage des sessions admin (dépôt temporaire) ────────
+admin_sessions: dict[str, str] = {}
+
 
 @router.post("/login")
 async def admin_login(

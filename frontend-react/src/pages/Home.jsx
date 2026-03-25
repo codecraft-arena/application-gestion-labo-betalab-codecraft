@@ -40,7 +40,7 @@ export default function Home() {
               className="hero-cta-row fade-in-up"
               style={{ animationDelay: "0.4s" }}
             >
-              <Link to="/nous-rejoindre" className="btn-primary-custom">
+              <Link to="/contact" className="btn-primary-custom">
                 <i
                   className="fas fa-user-plus"
                   style={{ marginRight: "0.5rem" }}

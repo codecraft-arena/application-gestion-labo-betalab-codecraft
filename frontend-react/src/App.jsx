@@ -13,7 +13,6 @@ import DashAdmin   from "./pages/DashAdmin";
 import APropos     from "./pages/APropos";
 import FAQ         from "./pages/FAQ";
 import Blog        from "./pages/Blog";
-import NousRejoindre from "./pages/NousRejoindre";
 import Contact     from "./pages/Contact";
 import Fondateurs  from "./pages/Fondateurs";
 import AdhesionForm from "./pages/AdhesionForm";  // ← NOUVEAU
@@ -33,7 +32,6 @@ function App() {
       <Route path="/a-propos"       element={<APropos />} />
       <Route path="/faq"            element={<FAQ />} />
       <Route path="/blog"           element={<Blog />} />
-      <Route path="/nous-rejoindre" element={<NousRejoindre />} />
       <Route path="/contact"        element={<Contact />} />
       <Route path="/fondateurs"     element={<Fondateurs />} />
 

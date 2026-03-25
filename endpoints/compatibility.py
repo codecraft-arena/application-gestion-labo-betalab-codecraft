@@ -283,7 +283,7 @@ async def list_all_users_api_compat(
     users = db.query(models.User).all()
     return [
         {
-            "mailer": u.email,
+            "email": u.email,
             "name": u.name,
             "occupation": u.occupation,
             "institution": u.institution,
@@ -376,13 +376,16 @@ async def list_pending_users_api_compat(
     pending_users = db.query(models.User).filter(models.User.validated == False).all()
     return [
         {
-            "mailer": u.email,
+            "email": u.email,
             "name": u.name,
             "occupation": u.occupation,
             "institution": u.institution,
             "role": u.role,
             "validated": u.validated,
             "suspended": u.suspended,
+            "level": u.level,
+            "domain": u.domain,
+            "motivation": u.motivation,
         }
         for u in pending_users
     ]
@@ -404,15 +407,23 @@ async def list_admin_contributions_api_compat(
             detail="Accès admin requis"
         )
     
-    contributions = db.query(models.Contribute).all()
+    contributions = db.query(models.Contribute, models.User, models.Activity).join(
+        models.User, models.Contribute.id_user == models.User.email
+    ).join(
+        models.Activity, models.Contribute.id_activity == models.Activity.id_activity
+    ).all()
+    
     return [
         {
-            "id_user": c.id_user,
-            "id_activity": c.id_activity,
+            "user_email": u.email,
+            "user_name": u.name,
+            "id_activity": a.id_activity,
+            "name_activity": a.name_activity,
+            "class_activity": a.class_activity,
             "participation_status": c.participation_status,
-            "participation_date": c.participation_date,
+            "participation_date": c.period.isoformat() if hasattr(c, "period") and c.period else None,
         }
-        for c in contributions
+        for c, u, a in contributions
     ]
 
 
@@ -457,17 +468,44 @@ async def list_user_contributions_api_compat(
             detail="Non authentifié"
         )
     
-    contributions = db.query(models.Contribute).filter(
-        models.Contribute.id_user == email
+    # Activités
+    act_contribs = db.query(models.Contribute, models.Activity).join(
+        models.Activity, models.Contribute.id_activity == models.Activity.id_activity
+    ).filter(
+        models.Contribute.id_user == email,
+        models.Contribute.participation_status == "accepted"
     ).all()
+    
+    # Événements
+    evt_contribs = db.query(models.EventParticipate, models.Event).join(
+        models.Event, models.EventParticipate.id_event == models.Event.id
+    ).filter(
+        models.EventParticipate.id_user == email,
+        models.EventParticipate.status == "accepted"
+    ).all()
+
     return [
         {
             "id_user": c.id_user,
             "id_activity": c.id_activity,
+            "name_activity": a.name_activity,
+            "description": a.description,
+            "class_activity": a.class_activity,
             "participation_status": c.participation_status,
-            "participation_date": c.participation_date,
+            "participation_date": c.period.isoformat() if hasattr(c, "period") and c.period else None,
         }
-        for c in contributions
+        for c, a in act_contribs
+    ] + [
+        {
+            "id_user": p.id_user,
+            "id_activity": e.id,
+            "name_activity": e.title,
+            "description": e.description,
+            "class_activity": e.event_type,
+            "participation_status": p.status,
+            "participation_date": e.event_date.isoformat() if e.event_date else None,
+        }
+        for p, e in evt_contribs
     ]
 
 
@@ -488,8 +526,43 @@ async def list_user_invitations_api_compat(
             detail="Non authentifié"
         )
     
-    # Pour l'instant, retourner une liste vide
-    return []
+    # Activités
+    act_invs = db.query(models.Contribute, models.Activity).join(
+        models.Activity, models.Contribute.id_activity == models.Activity.id_activity
+    ).filter(
+        models.Contribute.id_user == email,
+        models.Contribute.participation_status == "pending"
+    ).all()
+    
+    # Événements
+    evt_invs = db.query(models.EventParticipate, models.Event).join(
+        models.Event, models.EventParticipate.id_event == models.Event.id
+    ).filter(
+        models.EventParticipate.id_user == email,
+        models.EventParticipate.status == "pending"
+    ).all()
+
+    return [
+        {
+            "type": "activity",
+            "id_activity": a.id_activity,
+            "name_activity": a.name_activity,
+            "description": a.description,
+            "class_activity": a.class_activity,
+            "participation_status": c.participation_status,
+        }
+        for c, a in act_invs
+    ] + [
+        {
+            "type": "event",
+            "id_event": e.id,
+            "name_activity": e.title, # Mapper sur name_activity pour compatibilité UI
+            "description": e.description,
+            "class_activity": e.event_type, # Mapper sur class_activity
+            "participation_status": p.status,
+        }
+        for p, e in evt_invs
+    ]
 
 
 @router.get("/api/questions/user/{email}")
@@ -518,6 +591,15 @@ async def list_user_questions_api_compat(
             "libele_question": q.libele_question,
             "description_question": q.description_question,
             "date_question": q.created_at,
+            "visibility": q.visibility,
+            "responses": [
+                {
+                    "id_response": r.id_response,
+                    "libelle_response": r.libelle_response,
+                    "description_response": r.description_response,
+                }
+                for r in q.responses
+            ] if q.responses else [],
         }
         for q in questions
     ]
@@ -771,11 +853,12 @@ async def list_events_api_compat(
     events = db.query(models.Event).all()
     return [
         {
-            "id_event": e.id,
-            "libele": e.title,  # Utiliser title au lieu de libele
+            "id": e.id,
+            "title": e.title,
             "description": e.description,
-            "date_event": e.event_date,
-            "lieu": e.location,  # Utiliser location au lieu de lieu
+            "event_date": e.event_date,
+            "location": e.location,
+            "event_type": e.event_type,
         }
         for e in events
     ]
@@ -803,7 +886,17 @@ async def list_questions_api_compat(
             "id_question": q.id_question,
             "id_user": q.id_user,
             "libele_question": q.libele_question,
+            "description_question": q.description_question,
             "date_question": q.created_at,
+            "visibility": q.visibility,
+            "responses": [
+                {
+                    "id_response": r.id_response,
+                    "libelle_response": r.libelle_response,
+                    "description_response": r.description_response,
+                }
+                for r in q.responses
+            ] if q.responses else [],
         }
         for q in questions
     ]
@@ -831,7 +924,7 @@ async def list_contributions_api_compat(
             "id_user": c.id_user,
             "id_activity": c.id_activity,
             "participation_status": c.participation_status,
-            "participation_date": c.participation_date,
+            "participation_date": c.period.isoformat() if hasattr(c, "period") and c.period else None,
         }
         for c in contributions
     ]
@@ -856,11 +949,12 @@ async def list_suggestions_api_compat(
     suggestions = db.query(models.Sugestion).all()
     return [
         {
-            "id_suggest": s.id_suggest,
-            "id_user": s.id_user,
-            "libele": s.libele,
-            "note": s.note,
-            "date_suggest": s.created_at,
+            "id": s.id_suggest,
+            "user": s.id_user,
+            "title": s.libele,
+            "description": s.description_suggest,
+            "rating": s.note,
+            "created_at": s.created_at,
         }
         for s in suggestions
     ]
@@ -882,36 +976,106 @@ async def list_pending_approvals_api_compat(
             detail="Accès admin requis"
         )
     
-    # Récupérer les demandes en attente
-    profile_requests = db.query(models.ProfileModificationRequest).filter(
-        models.ProfileModificationRequest.status == "pending"
+    # Profile modifications
+    profile_mods = db.query(models.ProfileModificationRequest).filter(
+        models.ProfileModificationRequest.request_status == "pending"
     ).all()
     
-    activity_requests = db.query(models.ActivityModificationRequest).filter(
-        models.ActivityModificationRequest.status == "pending"
+    # Questions pending
+    questions = db.query(models.Question).filter(
+        models.Question.visibility == "pending"
+    ).all()
+    
+    # Suggestions pending
+    suggestions = db.query(models.Sugestion).filter(
+        models.Sugestion.visibility == "pending"
+    ).all()
+    
+    # Activities pending
+    activities = db.query(models.Activity).filter(
+        models.Activity.user_approval_status == "pending_submission"
+    ).all()
+
+    # Contributions pending (participation requests)
+    contributions = db.query(models.Contribute, models.Activity).join(
+        models.Activity, models.Contribute.id_activity == models.Activity.id_activity
+    ).filter(
+        models.Contribute.participation_status == "pending"
+    ).all()
+
+    # Event participations pending
+    event_parts = db.query(models.EventParticipate, models.Event).join(
+        models.Event, models.EventParticipate.id_event == models.Event.id
+    ).filter(
+        models.EventParticipate.status == "pending"
     ).all()
     
     return {
-        "profile_requests": [
+        "profile_modifications": [
             {
-                "id": req.id,
-                "user_email": req.user_email,
-                "request_type": req.request_type,
-                "new_value": req.new_value,
-                "created_at": req.created_at,
-            }
-            for req in profile_requests
+                "id": m.id,
+                "user_email": m.user_email,
+                "field": m.field_name,
+                "old_value": m.old_value,
+                "new_value": m.new_value,
+                "created_at": m.created_at,
+            } for m in profile_mods
         ],
-        "activity_requests": [
+        "pending_questions": [
             {
-                "id": req.id,
-                "id_activity": req.id_activity,
-                "request_type": req.request_type,
-                "new_value": req.new_value,
-                "created_at": req.created_at,
-            }
-            for req in activity_requests
-        ]
+                "id": q.id_question,
+                "user": q.id_user,
+                "title": q.libele_question,
+                "description": q.description_question,
+                "created_at": q.created_at,
+            } for q in questions
+        ],
+        "pending_suggestions": [
+            {
+                "id": s.id_suggest,
+                "user": s.id_user,
+                "title": s.libele,
+                "description": s.description_suggest,
+                "rating": s.note,
+                "created_at": s.created_at,
+            } for s in suggestions
+        ],
+        "pending_activities": [
+            {
+                "id": a.id_activity,
+                "name": a.name_activity,
+                "creator": a.created_by,
+                "description": a.description,
+                "class": a.class_activity,
+            } for a in activities
+        ],
+        "pending_contributions": [
+            {
+                "id": f"contrib/{c.id_activity}/{c.id_user}",
+                "user": c.id_user,
+                "title": f"Demande Participation: {a.name_activity}",
+                "description": f"Détails: {a.description[:100]}...",
+                "created_at": datetime.utcnow(),
+            } for c, a in contributions
+        ],
+        "pending_event_participations": [
+            {
+                "id": f"event/{p.id_event}/{p.id_user}",
+                "user": p.id_user,
+                "title": f"Demande Participation Event: {e.title}",
+                "description": f"Lieu: {e.location}",
+                "created_at": p.created_at,
+            } for p, e in event_parts
+        ],
+        "counts": {
+            "profile_modifications": len(profile_mods),
+            "questions": len(questions),
+            "suggestions": len(suggestions),
+            "activities": len(activities),
+            "contributions": len(contributions),
+            "events": len(event_parts),
+            "total": len(profile_mods) + len(questions) + len(suggestions) + len(activities) + len(contributions) + len(event_parts),
+        }
     }
 
 
@@ -943,8 +1107,12 @@ async def list_all_users_compat(
             "name": u.name,
             "occupation": u.occupation,
             "institution": u.institution,
+            "level": u.level,
+            "domain": u.domain,
+            "motivation": u.motivation,
             "role": u.role,
             "suspended": u.suspended,
+            "validated": u.validated,
         }
         for u in users
     ]
@@ -967,7 +1135,8 @@ async def list_pending_users_compat(
         )
     
     pending = db.query(models.User).filter(
-        models.User.role == "pending"
+        models.User.validated == False,
+        models.User.suspended == False
     ).all()
     return [
         {
@@ -975,6 +1144,12 @@ async def list_pending_users_compat(
             "name": u.name,
             "occupation": u.occupation,
             "institution": u.institution,
+            "level": u.level,
+            "domain": u.domain,
+            "motivation": u.motivation,
+            "role": u.role,
+            "validated": False,
+            "suspended": False,
         }
         for u in pending
     ]
@@ -994,11 +1169,11 @@ async def list_activities_compat(
     return [
         {
             "id_activity": a.id_activity,
-            "libele": a.libele,
+            "name_activity": a.name_activity,
             "description": a.description,
-            "start_date": a.start_date,
-            "end_date": a.end_date,
-            "max_participant": a.max_participant,
+            "status": a.status,
+            "class_activity": a.class_activity,
+            "user_approval_status": a.user_approval_status,
         }
         for a in activities
     ]
@@ -1024,11 +1199,12 @@ async def list_admin_events_compat(
     events = db.query(models.Event).all()
     return [
         {
-            "id_event": e.id_event,
-            "libele": e.libele,
+            "id": e.id,
+            "title": e.title,
             "description": e.description,
-            "date_event": e.date_event,
-            "lieu": e.lieu,
+            "event_date": e.event_date,
+            "location": e.location,
+            "event_type": e.event_type,
         }
         for e in events
     ]
@@ -1052,7 +1228,7 @@ async def get_user_contributions_compat(
         {
             "id_activity": c.id_activity,
             "participation_status": c.participation_status,
-            "participation_date": c.participation_date,
+            "participation_date": c.period.isoformat() if hasattr(c, "period") and c.period else None,
         }
         for c in contributions
     ]
@@ -1079,7 +1255,7 @@ async def get_user_invitations_compat(
         if activity:
             result.append({
                 "id_activity": activity.id_activity,
-                "libele": activity.libele,
+                "name_activity": activity.name_activity,
                 "description": activity.description,
                 "participation_status": inv.participation_status,
             })
@@ -1095,10 +1271,10 @@ async def handle_invitation_compat(
     db: Session = Depends(get_db),
 ):
     """Handle invitation (accept/reject) — Maps to contribution update."""
-    if action not in ["accept", "reject"]:
+    if action not in ["accept", "reject", "refuse"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Action invalide. Utilisez 'accept' ou 'reject'"
+            detail="Action invalide. Utilisez 'accept' ou 'reject'/'refuse'"
         )
     
     # Vérifier utilisateur
@@ -1110,26 +1286,44 @@ async def handle_invitation_compat(
             detail="Non autorisé"
         )
     
-    # Trouver contribution
+    # Trouver contribution (Activité ou Événement)
     contribution = db.query(models.Contribute).filter(
         models.Contribute.id_user == email,
         models.Contribute.id_activity == activity_id
     ).first()
     
+    event_part = None
     if not contribution:
+        # Essayer comme un événement
+        try:
+            evt_id = int(activity_id)
+            event_part = db.query(models.EventParticipate).filter(
+                models.EventParticipate.id_user == email,
+                models.EventParticipate.id_event == evt_id
+            ).first()
+        except (ValueError, TypeError):
+            pass
+
+    if not contribution and not event_part:
         raise HTTPException(
             status_code=404,
             detail="Invitation non trouvée"
         )
     
-    # Mettre à jour statut
-    contribution.participation_status = "accepted" if action == "accept" else "rejected"
-    contribution.participation_date = datetime.utcnow() if action == "accept" else None
+    is_accept = (action == "accept")
+    status_str = "accepted" if is_accept else "rejected"
+
+    if contribution:
+        contribution.participation_status = status_str
+        contribution.period = datetime.utcnow().date() if is_accept else None
+    else:
+        event_part.status = status_str
+
     db.commit()
     
     return {
         "detail": f"Invitation {action}ée",
-        "participation_status": contribution.participation_status
+        "participation_status": status_str
     }
 
 
@@ -1149,6 +1343,15 @@ async def get_user_questions_compat(
             "libele_question": q.libele_question,
             "description_question": q.description_question,
             "date_question": q.created_at,
+            "visibility": q.visibility,
+            "responses": [
+                {
+                    "id_response": r.id_response,
+                    "libelle_response": r.libelle_response,
+                    "description_response": r.description_response,
+                }
+                for r in q.responses
+            ] if q.responses else [],
         }
         for q in questions
     ]
@@ -1209,7 +1412,17 @@ async def list_admin_questions_compat(
             "id_question": q.id_question,
             "id_user": q.id_user,
             "libele_question": q.libele_question,
+            "description_question": q.description_question,
             "date_question": q.created_at,
+            "visibility": q.visibility,
+            "responses": [
+                {
+                    "id_response": r.id_response,
+                    "libelle_response": r.libelle_response,
+                    "description_response": r.description_response,
+                }
+                for r in q.responses
+            ] if q.responses else [],
         }
         for q in questions
     ]
@@ -1296,7 +1509,7 @@ async def list_admin_contributions_compat(
             "id_user": c.id_user,
             "id_activity": c.id_activity,
             "participation_status": c.participation_status,
-            "participation_date": c.participation_date,
+            "participation_date": c.period.isoformat() if hasattr(c, "period") and c.period else None,
         }
         for c in contributions
     ]
@@ -1357,14 +1570,14 @@ async def submit_contact_form_compat(
         message=body.get("message", ""),
         is_join_request=is_join_request,
         status="pending",
-        date_request=datetime.utcnow(),
+        created_at=datetime.utcnow(),
     )
     db.add(contact)
     db.commit()
     
     return {
         "detail": "Formulaire de contact reçu",
-        "contact_id": contact.id_contact,
+        "contact_id": contact.id,
         "is_join_request": is_join_request,
     }
 
@@ -1407,7 +1620,7 @@ async def verify_adhesion_token_compat(
     
     # Récupérer le contact original pour le nom
     contact = db.query(models.ContactRequest).filter(
-        models.ContactRequest.id_contact == inv_token.id_contact
+        models.ContactRequest.id == inv_token.contact_id
     ).first()
     
     return {
@@ -1503,9 +1716,12 @@ async def validate_user_compat(
     db: Session = Depends(get_db),
 ):
     """Admin: Validate user — Maps to /api/admin/users/{mailer}/validate"""
-    from endpoints.admin.admin_auth import admin_sessions
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     user = db.query(models.User).filter(models.User.email == email).first()
@@ -1517,6 +1733,31 @@ async def validate_user_compat(
     return {"message": f"Utilisateur {user.name} validé", "validated": True}
 
 
+@router.put("/api/users/{email}/reject")
+async def reject_user_compat(
+    email: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Reject (delete) pending user — supprime un utilisateur en attente"""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    user_name = user.name
+    db.delete(user)
+    db.commit()
+    return {"message": f"Utilisateur {user_name} rejeté et supprimé"}
+
+
 @router.put("/api/users/{email}/suspend")
 async def suspend_user_compat(
     email: str,
@@ -1524,9 +1765,12 @@ async def suspend_user_compat(
     db: Session = Depends(get_db),
 ):
     """Admin: Suspend user — Maps to /api/admin/users/{mailer}/suspend"""
-    from endpoints.admin.admin_auth import admin_sessions
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     user = db.query(models.User).filter(models.User.email == email).first()
@@ -1545,9 +1789,12 @@ async def unsuspend_user_compat(
     db: Session = Depends(get_db),
 ):
     """Admin: Unsuspend user — Maps to /api/admin/users/{mailer}/unsuspend"""
-    from endpoints.admin.admin_auth import admin_sessions
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     user = db.query(models.User).filter(models.User.email == email).first()
@@ -1566,15 +1813,20 @@ async def delete_user_compat(
     db: Session = Depends(get_db),
 ):
     """Admin: Delete user — Maps to /api/admin/users/{mailer}"""
-    from endpoints.admin.admin_auth import admin_sessions
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     
+    # Supprimer les sessions de l'utilisateur d'abord
+    db.query(models.Session).filter(models.Session.user_mailer == email).delete()
     user_name = user.name
     db.delete(user)
     db.commit()
@@ -1592,9 +1844,12 @@ async def validate_activity_compat(
     db: Session = Depends(get_db),
 ):
     """Admin: Validate activity — Maps to /api/admin/activities/{id}/validate"""
-    from endpoints.admin.admin_auth import admin_sessions
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     activity = db.query(models.Activity).filter(
@@ -1615,9 +1870,12 @@ async def reject_activity_compat(
     db: Session = Depends(get_db),
 ):
     """Admin: Reject activity — Maps to /api/admin/activities/{id}/reject"""
-    from endpoints.admin.admin_auth import admin_sessions
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     activity = db.query(models.Activity).filter(
@@ -1638,9 +1896,12 @@ async def delete_activity_compat(
     db: Session = Depends(get_db),
 ):
     """Admin: Delete activity — Maps to /api/admin/activities/{id}"""
-    from endpoints.admin.admin_auth import admin_sessions
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     activity = db.query(models.Activity).filter(
@@ -1663,9 +1924,12 @@ async def invite_to_activity_compat(
     db: Session = Depends(get_db),
 ):
     """Admin: Invite user to activity — Maps to /api/admin/activities/{id}/invite/{mailer}"""
-    from endpoints.admin.admin_auth import admin_sessions
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     # Vérifier activité existe
@@ -1693,7 +1957,7 @@ async def invite_to_activity_compat(
         id_user=email,
         id_activity=activity_id,
         participation_status="pending",
-        participation_date=None,
+        period=None,
     )
     db.add(contrib)
     db.commit()
@@ -1704,3 +1968,617 @@ async def invite_to_activity_compat(
         "activity_id": activity_id,
         "participation_status": "pending"
     }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ADMIN APPROVALS & DELETIONS (Compatibility)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Profile Modification Approval & Rejection
+@router.put("/api/admin/profile-modification/{mod_id}/approve")
+async def approve_profile_mod(
+    mod_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Approve profile modification."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    mod = db.query(models.ProfileModificationRequest).filter(
+        models.ProfileModificationRequest.id == mod_id
+    ).first()
+    if not mod:
+        raise HTTPException(status_code=404, detail="Demande non trouvée")
+    
+    user = db.query(models.User).filter(models.User.email == mod.user_email).first()
+    if user:
+        setattr(user, mod.field_name, mod.new_value)
+    
+    mod.request_status = "approved"
+    db.commit()
+    return {"message": "Modification approuvée"}
+
+
+@router.put("/api/admin/profile-modification/{mod_id}/reject")
+async def reject_profile_mod(
+    mod_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Reject profile modification."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    mod = db.query(models.ProfileModificationRequest).filter(
+        models.ProfileModificationRequest.id == mod_id
+    ).first()
+    if not mod:
+        raise HTTPException(status_code=404, detail="Demande non trouvée")
+    
+    mod.request_status = "rejected"
+    db.commit()
+    return {"message": "Modification rejetée"}
+
+
+# Question Approval & Rejection & Deletion
+@router.put("/api/admin/questions/{question_id}/approve")
+async def approve_question_compat(
+    question_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Approve question."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    q = db.query(models.Question).filter(models.Question.id_question == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question non trouvée")
+    
+    q.visibility = "approved"
+    db.commit()
+    return {"message": "Question approuvée"}
+
+
+@router.put("/api/admin/questions/{question_id}/reject")
+async def reject_question_compat(
+    question_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Reject question."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    q = db.query(models.Question).filter(models.Question.id_question == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question non trouvée")
+    
+    q.visibility = "rejected"
+    db.commit()
+    return {"message": "Question rejetée"}
+
+
+@router.delete("/api/admin/questions/{question_id}")
+async def delete_question_compat(
+    question_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Delete question."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    q = db.query(models.Question).filter(models.Question.id_question == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question non trouvée")
+    
+    # Supprimer les réponses
+    db.query(models.Response).filter(models.Response.id_question == question_id).delete()
+    db.delete(q)
+    db.commit()
+    return {"message": "Question supprimée"}
+
+
+# Suggestion Approval & Rejection & Deletion
+@router.put("/api/admin/suggestions/{suggestion_id}/approve")
+async def approve_suggestion_compat(
+    suggestion_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Approve suggestion."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    s = db.query(models.Sugestion).filter(models.Sugestion.id_suggest == suggestion_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Suggestion non trouvée")
+    
+    s.visibility = "approved"
+    db.commit()
+    return {"message": "Suggestion approuvée"}
+
+
+@router.put("/api/admin/suggestions/{suggestion_id}/reject")
+async def reject_suggestion_compat(
+    suggestion_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Reject suggestion."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    s = db.query(models.Sugestion).filter(models.Sugestion.id_suggest == suggestion_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Suggestion non trouvée")
+    
+    s.visibility = "rejected"
+    db.commit()
+    return {"message": "Suggestion rejetée"}
+
+
+@router.delete("/api/admin/suggestions/{suggestion_id}")
+async def delete_suggestion_compat(
+    suggestion_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Delete suggestion."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    s = db.query(models.Sugestion).filter(models.Sugestion.id_suggest == suggestion_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Suggestion non trouvée")
+    
+    db.delete(s)
+    db.commit()
+    return {"message": "Suggestion supprimée"}
+
+
+# Activity Approval & Rejection & Deletion
+@router.put("/api/admin/activities/{activity_id}/approve")
+async def approve_activity_compat(
+    activity_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Approve activity."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    a = db.query(models.Activity).filter(models.Activity.id_activity == activity_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Activité non trouvée")
+    
+    a.user_approval_status = "approved"
+    db.commit()
+    return {"message": "Activité approuvée"}
+
+
+@router.put("/api/admin/activities/{activity_id}/reject")
+async def reject_activity_compat(
+    activity_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Reject activity."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    a = db.query(models.Activity).filter(models.Activity.id_activity == activity_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Activité non trouvée")
+    
+    a.user_approval_status = "rejected"
+    db.commit()
+    return {"message": "Activité rejetée"}
+
+
+# Event Deletion
+@router.delete("/api/admin/events/{event_id}")
+async def delete_event_compat(
+    event_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Delete event."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    e = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Événement non trouvé")
+    
+    db.delete(e)
+    db.commit()
+    return {"message": "Événement supprimé"}
+
+
+# Contact Deletion
+@router.delete("/api/contact/{contact_id}")
+async def delete_contact_compat(
+    contact_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Delete contact request."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    c = db.query(models.ContactRequest).filter(models.ContactRequest.id == contact_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Message non trouvé")
+    
+    db.delete(c)
+    db.commit()
+    return {"message": "Message de contact supprimé"}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ADMIN USER CREATION
+# ═════════════════════════════════════════════════════════════════════════════
+
+@router.post("/api/admin/users/create")
+async def create_admin_user_compat(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Create a new user with auto-generated credentials."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token, models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    body = await request.json()
+    
+    import string
+    import secrets
+    
+    # Get name from body
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Le nom est requis")
+    
+    # Generate email from name
+    base_email = name.lower().replace(" ", ".")
+    email = f"{base_email}@betalab.local"
+    counter = 1
+    
+    # Avoid duplicate emails
+    while db.query(models.User).filter(models.User.email == email).first():
+        email = f"{base_email}{counter}@betalab.local"
+        counter += 1
+    
+    # Generate temporary password
+    default_password = "".join(
+        secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*")
+        for _ in range(10)
+    )
+    
+    # Create user
+    user = models.User(
+        email=email,
+        name=name,
+        birthdate=datetime.utcnow().date(),
+        occupation="Non spécifié",
+        institution="Non spécifié",
+        level="",
+        domain="",
+        password=get_password_hash(default_password),
+        motivation="",
+        validated=False,
+        suspended=False,
+        role="membre",
+    )
+    
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": f"Utilisateur {name} créé avec succès",
+        "email": email,
+        "password": default_password,
+        "username": email,
+        "user": {
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "validated": user.validated,
+        }
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# DISCOVERY & PARTICIPATION (ALL)
+# ═════════════════════════════════════════════════════════════════════════════
+
+@router.get("/api/activities/all")
+async def list_all_activities_discovery(db: Session = Depends(get_db)):
+    """List all approved activities for user discovery."""
+    return db.query(models.Activity).filter(
+        models.Activity.status == "approved"
+    ).all()
+
+
+@router.get("/api/events/all")
+async def list_all_events_discovery(db: Session = Depends(get_db)):
+    """List all events for user discovery."""
+    return db.query(models.Event).all()
+
+
+@router.post("/api/activities/{activity_id}/request")
+async def request_activity_participation(
+    activity_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """User: Request to join an activity."""
+    token = request.cookies.get("session_token")
+    user = SessionManager.get_user_from_token(db, token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    # Check if already participating or pending
+    existing = db.query(models.Contribute).filter(
+        models.Contribute.id_user == user.email,
+        models.Contribute.id_activity == activity_id
+    ).first()
+    if existing:
+        return {"message": "Demande déjà envoyée ou participation active", "status": existing.participation_status}
+    
+    contrib = models.Contribute(
+        id_user=user.email,
+        id_activity=activity_id,
+        participation_status="pending",
+    )
+    db.add(contrib)
+    db.commit()
+    return {"message": "Demande de participation envoyée", "status": "pending"}
+
+
+@router.post("/api/events/{event_id}/request")
+async def request_event_participation(
+    event_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """User: Request to join an event."""
+    token = request.cookies.get("session_token")
+    user = SessionManager.get_user_from_token(db, token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    existing = db.query(models.EventParticipate).filter(
+        models.EventParticipate.id_user == user.email,
+        models.EventParticipate.id_event == event_id
+    ).first()
+    if existing:
+        return {"message": "Demande déjà envoyée ou participation active", "status": existing.status}
+    
+    part = models.EventParticipate(
+        id_user=user.email,
+        id_event=event_id,
+        status="pending",
+    )
+    db.add(part)
+    db.commit()
+    return {"message": "Demande de participation envoyée", "status": "pending"}
+
+
+@router.put("/api/admin/profile/update")
+async def update_admin_profile_compat(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Update own profile."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Accès admin requis")
+    
+    try:
+        data = await request.json()
+        
+        # Get current admin user (assuming admin email is stored in session or hardcoded)
+        admin_email = "admin"  # This should be dynamic based on your admin system
+        
+        # Update admin user in database
+        admin_user = db.query(models.User).filter(models.User.email == admin_email).first()
+        if not admin_user:
+            raise HTTPException(status_code=404, detail="Admin user not found")
+        
+        # Update fields if provided
+        if "name" in data and data["name"]:
+            admin_user.name = data["name"]
+        if "firstname" in data and data["firstname"]:
+            admin_user.firstname = data["firstname"]
+        if "email" in data and data["email"] and data["email"] != admin_email:
+            # Check if new email already exists
+            existing = db.query(models.User).filter(models.User.email == data["email"]).first()
+            if existing:
+                raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+            admin_user.email = data["email"]
+        if "phone" in data and data["phone"]:
+            admin_user.phone = data["phone"]
+        
+        # Update password if provided
+        if "password" in data and data["password"] and data["password"].strip():
+            if "confirmPassword" not in data or data["password"] != data["confirmPassword"]:
+                raise HTTPException(status_code=400, detail="Les mots de passe ne correspondent pas")
+            
+            # Hash new password
+            from passlib.context import CryptContext
+            pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+            admin_user.password = pwd_context.hash(data["password"])
+        
+        db.commit()
+        
+        return {"message": "Profil mis à jour avec succès"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/api/events/{event_id}/invite/{email}")
+async def invite_to_event_compat(
+    event_id: int,
+    email: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Invite user to event."""
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Accès admin requis")
+    
+    existing = db.query(models.EventParticipate).filter(
+        models.EventParticipate.id_user == email,
+        models.EventParticipate.id_event == event_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Utilisateur déjà invité")
+    
+    part = models.EventParticipate(
+        id_user=email,
+        id_event=event_id,
+        status="pending",
+    )
+    db.add(part)
+    db.commit()
+    return {"message": f"Invitation envoyée à {email}"}
+
+
+@router.put("/api/admin/contributions/{activity_id}/{email}/{action}")
+async def approve_contribution_compat(
+    activity_id: str,
+    email: str,
+    action: str, # approve | reject
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Approve or reject participation request."""
+    # Auth check
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Accès admin requis")
+    
+    contrib = db.query(models.Contribute).filter(
+        models.Contribute.id_user == email,
+        models.Contribute.id_activity == activity_id
+    ).first()
+    
+    if not contrib:
+        raise HTTPException(status_code=404, detail="Demande introuvable")
+    
+    if action == "approve":
+        contrib.participation_status = "accepted"
+        contrib.period = datetime.utcnow().date()
+    else:
+        contrib.participation_status = "refused"
+    
+    db.commit()
+    return {"message": f"Participation {action}ée"}
+
+
+@router.put("/api/admin/events/participations/{event_id}/{email}/{action}")
+async def approve_event_participation_compat(
+    event_id: int,
+    email: str,
+    action: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Admin: Approve or reject event participation request."""
+    # Auth check
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Accès admin requis")
+    
+    part = db.query(models.EventParticipate).filter(
+        models.EventParticipate.id_user == email,
+        models.EventParticipate.id_event == event_id
+    ).first()
+    
+    if not part:
+        raise HTTPException(status_code=404, detail="Demande introuvable")
+    
+    if action == "approve":
+        part.status = "accepted"
+    else:
+        part.status = "rejected"
+    
+    db.commit()
+    return {"message": f"Participation {action}ée"}
+

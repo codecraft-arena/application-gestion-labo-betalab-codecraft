@@ -38,6 +38,14 @@ class SessionManager:
         return token
     
     @staticmethod
+    def get_session(db: Session, token: str) -> models.Session | None:
+        """Récupère une session par son token si elle n'est pas expirée."""
+        return db.query(models.Session).filter(
+            models.Session.token == token,
+            models.Session.expires_at > datetime.utcnow()
+        ).first()
+
+    @staticmethod
     def get_user_from_token(db: Session, token: str) -> models.User | None:
         """
         Récupère l'utilisateur à partir d'un token de session.

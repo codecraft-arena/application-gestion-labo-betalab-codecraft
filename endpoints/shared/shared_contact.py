@@ -67,10 +67,12 @@ async def list_contacts(
     db: Session = Depends(get_db),
 ):
     """Admin: récupère les demandes de contact."""
-    from endpoints.admin.admin_auth import admin_sessions
-    
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     q = db.query(models.ContactRequest)
@@ -86,10 +88,12 @@ async def mark_contact_read(
     db: Session = Depends(get_db),
 ):
     """Admin: marque une demande comme lue."""
-    from endpoints.admin.admin_auth import admin_sessions
-    
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     c = db.query(models.ContactRequest).filter(models.ContactRequest.id == contact_id).first()
@@ -108,10 +112,12 @@ async def delete_contact(
     db: Session = Depends(get_db),
 ):
     """Admin: supprime une demande de contact."""
-    from endpoints.admin.admin_auth import admin_sessions
-    
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     c = db.query(models.ContactRequest).filter(models.ContactRequest.id == contact_id).first()
@@ -131,10 +137,12 @@ async def send_adhesion_invitation(
     db: Session = Depends(get_db),
 ):
     """Admin: envoie une invitation d'adhésion."""
-    from endpoints.admin.admin_auth import admin_sessions
-    
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     contact = db.query(models.ContactRequest).filter(

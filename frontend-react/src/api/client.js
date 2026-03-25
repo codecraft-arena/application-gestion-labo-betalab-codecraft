@@ -17,7 +17,21 @@ export async function apiFetch(path, options = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Erreur serveur");
+    // FastAPI validation errors (422) return detail as an array of objects
+    let detail = err.detail ?? "Erreur serveur";
+    if (Array.isArray(detail)) {
+      // Extract human-readable messages from FastAPI validation error objects
+      detail = detail
+        .map((e) => {
+          if (typeof e === "string") return e;
+          if (e.msg) return e.msg;
+          return JSON.stringify(e);
+        })
+        .join(", ");
+    } else if (typeof detail === "object") {
+      detail = JSON.stringify(detail);
+    }
+    throw new Error(String(detail));
   }
   return res.json();
 }

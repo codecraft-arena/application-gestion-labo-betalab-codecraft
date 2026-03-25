@@ -26,7 +26,10 @@ def verify_admin(request: Request, db: Session):
         raise HTTPException(status_code=401, detail="Admin not authenticated")
     
     # Vérifier la session en BD
-    session = SessionManager.get_session(db, token)
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.expires_at > datetime.utcnow()
+    ).first()
     if not session:
         raise HTTPException(status_code=401, detail="Invalid session")
     
@@ -168,15 +171,17 @@ async def approve_profile_modification(
     ).first()
     
     if not mod:
-        raise HTTPException(status_code=404, detail="Modification request not found")
+        raise HTTPException(status_code=404, detail="Demande de modification introuvable")
     
     if mod.request_status != "pending":
-        raise HTTPException(status_code=400, detail="Request already reviewed")
+        raise HTTPException(status_code=400, detail="Demande déjà traitée")
     
-    # Get user
+    # Get user — if they no longer exist, clean up the orphaned request
     user = db.query(models.User).filter(models.User.email == mod.user_email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        db.delete(mod)
+        db.commit()
+        return {"message": "Demande supprimée (utilisateur introuvable)", "user_email": mod.user_email}
     
     # Apply modification
     setattr(user, mod.field_name, mod.new_value)
@@ -200,7 +205,7 @@ async def approve_profile_modification(
         print(f"[EMAIL ERROR] Failed to send approval email: {e}")
     
     return {
-        "message": "Modification approved and applied",
+        "message": "Modification approuvée et appliquée",
         "user_email": mod.user_email,
         "field": mod.field_name,
         "new_value": mod.new_value,

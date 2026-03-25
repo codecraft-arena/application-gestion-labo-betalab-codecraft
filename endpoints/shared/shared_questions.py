@@ -57,7 +57,8 @@ async def get_user_questions(
     db: Session = Depends(get_db),
 ):
     """Récupère les questions d'un utilisateur."""
-    questions = db.query(models.Question).filter(
+    from sqlalchemy.orm import joinedload
+    questions = db.query(models.Question).options(joinedload(models.Question.responses)).filter(
         models.Question.id_user == user_mailer
     ).order_by(models.Question.id_question.desc()).all()
     
@@ -70,10 +71,12 @@ async def list_all_questions(
     db: Session = Depends(get_db),
 ):
     """Admin: lister toutes les questions (approved + pending)."""
-    from endpoints.admin.admin_auth import admin_sessions
-    
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     # Admin sees ALL questions (pending + approved + rejected)
@@ -82,7 +85,7 @@ async def list_all_questions(
     ).all()
 
 
-@router.post("/api/questions/{question_id}/answer", response_model=schemas.AnswerResponse)
+@router.post("/api/admin/questions/{question_id}/answer", response_model=schemas.AnswerResponse)
 async def answer_question(
     question_id: int,
     data: schemas.AnswerCreate,
@@ -90,14 +93,17 @@ async def answer_question(
     db: Session = Depends(get_db),
 ):
     """Admin: répondre à une question."""
-    from endpoints.admin.admin_auth import admin_sessions
     from datetime import datetime
     
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session_obj = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session_obj:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    admin_email = admin_sessions[token]  # Get admin email from session
+    admin_email = session_obj.user_mailer  # Get admin identifier from session
     
     q = db.query(models.Question).filter(
         models.Question.id_question == question_id
@@ -172,10 +178,12 @@ async def delete_question(
     db: Session = Depends(get_db),
 ):
     """Admin: supprimer une question."""
-    from endpoints.admin.admin_auth import admin_sessions
-    
-    token = request.cookies.get("admin_token")
-    if not token or token not in admin_sessions:
+    token = request.cookies.get("session_token")
+    session = db.query(models.Session).filter(
+        models.Session.token == token,
+        models.Session.session_type == "admin"
+    ).first()
+    if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
     q = db.query(models.Question).filter(

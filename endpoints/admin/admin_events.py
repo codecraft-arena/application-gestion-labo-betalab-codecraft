@@ -80,32 +80,23 @@ async def list_events(
     }
 
 
+import schemas
+
 @router.post("/events")
 async def create_event(
     request: Request,
-    title: str,
-    description: Optional[str] = None,
-    event_date: Optional[str] = None,
-    location: Optional[str] = None,
-    event_type: Optional[str] = "événement",
+    event_data: schemas.EventCreate,
     db: Session = Depends(get_db),
 ):
     """Crée un nouvel événement."""
     _verify_admin(request, db)
     
-    event_date_obj = None
-    if event_date:
-        try:
-            event_date_obj = datetime.strptime(event_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Format de date invalide (YYYY-MM-DD)")
-    
     event = models.Event(
-        title=title,
-        description=description,
-        event_date=event_date_obj,
-        location=location,
-        event_type=event_type,
+        title=event_data.title,
+        description=event_data.description,
+        event_date=event_data.event_date,
+        location=event_data.location,
+        event_type=event_data.event_type,
         created_by="admin",
     )
     
@@ -153,11 +144,7 @@ async def get_event_details(
 async def update_event(
     event_id: int,
     request: Request,
-    title: Optional[str] = None,
-    description: Optional[str] = None,
-    event_date: Optional[str] = None,
-    location: Optional[str] = None,
-    event_type: Optional[str] = None,
+    event_data: schemas.EventCreate, # On peut réutiliser EventCreate ou créer un EventUpdate
     db: Session = Depends(get_db),
 ):
     """Modifie un événement."""
@@ -168,19 +155,16 @@ async def update_event(
     if not event:
         raise HTTPException(status_code=404, detail="Événement non trouvé")
     
-    if title is not None:
-        event.title = title
-    if description is not None:
-        event.description = description
-    if event_date is not None:
-        try:
-            event.event_date = datetime.strptime(event_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Format de date invalide (YYYY-MM-DD)")
-    if location is not None:
-        event.location = location
-    if event_type is not None:
-        event.event_type = event_type
+    if event_data.title:
+        event.title = event_data.title
+    if event_data.description is not None:
+        event.description = event_data.description
+    if event_data.event_date:
+        event.event_date = event_data.event_date
+    if event_data.location is not None:
+        event.location = event_data.location
+    if event_data.event_type:
+        event.event_type = event_data.event_type
     
     db.commit()
     db.refresh(event)

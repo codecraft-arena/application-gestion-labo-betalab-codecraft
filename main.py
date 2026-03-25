@@ -102,7 +102,10 @@ def startup_event():
     finally:
         db.close()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+app.mount("/Report", StaticFiles(directory=os.path.join(BASE_DIR, "Report")), name="Report")
 
 # Inclure tous les routers
 print("📦 Chargement des endpoints...")
