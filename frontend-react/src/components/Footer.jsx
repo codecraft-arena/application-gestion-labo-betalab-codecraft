@@ -45,38 +45,36 @@ export default function Footer() {
             <h4 className="footer-title">Navigation</h4>
             <ul className="footer-links">
               <li>
-                <Link to="/">Accueil</Link>
-              </li>
-              <li>
-                <Link to="/design">Design</Link>
-              </li>
-              <li>
-                <Link to="/activites">Activités</Link>
-              </li>
-              <li>
-                <Link to="/stats">Statistiques</Link>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="footer-title">Compte</h4>
-            <ul className="footer-links">
-              <li>
-                <Link to="/login">Connexion</Link>
-              </li>
-              <li>
-                <Link to="/admin">Admin</Link>
-              </li>
+            <Link to="/">Accueil</Link>
+          </li>
+          <li>
+            <Link to="/activites">Activités</Link>
+          </li>
+          <li>
+            <Link to="/fondateurs">Fondateurs</Link>
+          </li>
+          <li>
+            <Link to="/blog">Blog</Link>
+          </li>
+          <li>
+            <Link to="/a-propos">A propos</Link>
+          </li>
+          <li>
+            <Link to="/faq">FAQ</Link>
+          </li>
+          <li>
+            <Link to="/contact">Contact</Link>
+          </li>
             </ul>
           </div>
           <div>
             <h4 className="footer-title">Contact</h4>
             <ul className="footer-links">
               <li>
-                <a href="#">contact@betalab.fr</a>
+                <a href="#">contact@beta-lab.fr</a>
               </li>
               <li>
-                <a href="#">+33 1 23 45 67 89</a>
+                <a href="#">+237 675 75 99 00 / +33 7 49 55 61 71</a>
               </li>
               <li>
                 <a href="#">Paris, France</a>
@@ -85,7 +83,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <p>© 2025 BetaLab. Tous droits réservés.</p>
+          <p>© 2026 BetaLab. Tous droits réservés.</p>
         </div>
       </div>
     </footer>

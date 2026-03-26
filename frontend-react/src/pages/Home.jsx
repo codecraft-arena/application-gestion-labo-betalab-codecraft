@@ -216,7 +216,7 @@ export default function Home() {
               moderne
             </p>
           </div>
-          <div className="activities-grid">
+          <div className="activities-grid activities-grid-3x2">
             {[
               {
                 img: "photo-1677442136019-21780ecad995",
@@ -242,19 +242,33 @@ export default function Home() {
                 title: "Big Data",
                 desc: "Analyse prédictive et visualisation de données",
               },
+              {
+                img: "photo-1517694712202-14dd9538aa97",
+                tag: "Développement",
+                title: "DevOps & Automatisation",
+                desc: "CI/CD, containerisation et infrastructure as code",
+              },
+              {
+                img: "photo-1517694712202-14dd9538aa97",
+                tag: "Web & Mobile",
+                title: "Développement Full-Stack",
+                desc: "Applications web modernes et solutions mobiles innovantes",
+              },
             ].map((a) => (
-              <div className="activity-card" key={a.title}>
-                <img
-                  src={`https://images.unsplash.com/${a.img}?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80`}
-                  alt={a.title}
-                  className="activity-image"
-                />
-                <div className="activity-overlay">
-                  <span className="activity-tag">{a.tag}</span>
-                  <h3>{a.title}</h3>
-                  <p>{a.desc}</p>
+              <Link to="/activites" key={a.title} style={{ textDecoration: "none" }}>
+                <div className="activity-card">
+                  <img
+                    src={`https://images.unsplash.com/${a.img}?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80`}
+                    alt={a.title}
+                    className="activity-image"
+                  />
+                  <div className="activity-overlay">
+                    <span className="activity-tag">{a.tag}</span>
+                    <h3>{a.title}</h3>
+                    <p>{a.desc}</p>
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -284,6 +298,96 @@ export default function Home() {
                 <span className="stat-number">{s.num}</span>
                 <span className="stat-label">{s.label}</span>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Explore Pages Section */}
+      <section
+        className="explore-pages-section"
+        id="explorer"
+        style={{ position: "relative", overflow: "hidden" }}
+      >
+        <NeuralCanvas
+          nodeCount={40}
+          connectionDist={125}
+          mouseRadius={165}
+          opacity={0.6}
+        />
+        <div className="container" style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+            <span className="section-label">EXPLOREZ</span>
+            <h2 className="section-title">Parcourez nos pages</h2>
+            <p
+              className="section-text"
+              style={{ maxWidth: "600px", margin: "0 auto" }}
+            >
+              Découvrez en détail chaque section de BetaLab. Cliquez sur une page pour en savoir plus.
+            </p>
+          </div>
+          <div className="explore-pages-grid">
+            {[
+              {
+                img: "photo-1677442136019-21780ecad995",
+                title: "Activités",
+                desc: "Explorez tous nos domaines de recherche et projets en cours",
+                path: "/activites",
+                icon: "fa-compass",
+              },
+              {
+                img: "/about/about-lab.jpg",
+                title: "À Propos",
+                desc: "Découvrez qui nous sommes et notre histoire",
+                path: "/a-propos",
+                icon: "fa-info-circle",
+              },
+              {
+                img: "/fondateurs/parfait.png",
+                title: "Nos Fondateurs",
+                desc: "Rencontrez les esprits derrière BetaLab",
+                path: "/fondateurs",
+                icon: "fa-users",
+              },
+              {
+                img: "photo-1586281388950-3cde73df8e79",
+                title: "Contact",
+                desc: "Rejoignez-nous et posez vos questions",
+                path: "/contact",
+                icon: "fa-envelope",
+              },
+              {
+                img: "photo-1454165804606-c3d57bc86b40",
+                title: "FAQ",
+                desc: "Trouvez les réponses à vos questions",
+                path: "/faq",
+                icon: "fa-question-circle",
+              },
+              {
+                img: "/Report/betalab15.JPG",
+                title: "Blog",
+                desc: "Lisez nos derniers articles et actualités",
+                path: "/blog",
+                icon: "fa-newspaper",
+              },
+            ].map((page) => (
+              <Link to={page.path} key={page.title} style={{ textDecoration: "none" }}>
+                <div className="page-card">
+                  <div className="page-card-image">
+                    <img
+                      src={page.img.includes("unsplash") || page.img.includes("photo-") ? `https://images.unsplash.com/${page.img}?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80` : page.img}
+                      alt={page.title}
+                    />
+                  </div>
+                  <div className="page-card-content">
+                    <h3>{page.title}</h3>
+                    <p>{page.desc}</p>
+                    <div className="page-card-link">
+                      Découvrir <i className="fas fa-arrow-right"></i>
+                    </div>
+                  </div>
+                </div>
+              </Link>
             ))}
           </div>
         </div>
